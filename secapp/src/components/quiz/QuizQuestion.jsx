@@ -1,0 +1,96 @@
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { CheckCircle2, XCircle } from 'lucide-react';
+
+export default function QuizQuestion({ 
+  question, 
+  questionNumber, 
+  totalQuestions, 
+  selectedAnswer, 
+  onAnswerSelect, 
+  showResults,
+  correctAnswer 
+}) {
+  const isCorrect = showResults && selectedAnswer === correctAnswer;
+  const isIncorrect = showResults && selectedAnswer !== correctAnswer && selectedAnswer !== null;
+
+  return (
+    <Card className="border-2 border-slate-200">
+      <CardHeader>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-slate-600">
+            Question {questionNumber} of {totalQuestions}
+          </span>
+          {showResults && (
+            <div className="flex items-center gap-2">
+              {isCorrect ? (
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span className="text-sm font-semibold">Correct</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-red-600">
+                  <XCircle className="w-5 h-5" />
+                  <span className="text-sm font-semibold">Incorrect</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <CardTitle className="text-lg text-slate-900 leading-relaxed">
+          {question.question}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <RadioGroup
+          key={`question-${questionNumber}`}
+          value={selectedAnswer !== undefined ? selectedAnswer.toString() : undefined}
+          onValueChange={(value) => onAnswerSelect(parseInt(value))}
+          disabled={showResults}
+        >
+          <div className="space-y-3">
+            {question.choices.map((choice, index) => {
+              const isThisCorrect = showResults && index === correctAnswer;
+              const isThisSelected = index === selectedAnswer;
+              const isThisIncorrect = showResults && isThisSelected && !isThisCorrect;
+
+              return (
+                <Label
+                  key={index}
+                  htmlFor={`q${questionNumber}-choice${index}`}
+                  className={`flex items-center space-x-3 p-4 rounded-lg border-2 transition-all ${
+                    isThisCorrect
+                      ? 'bg-green-50 border-green-300'
+                      : isThisIncorrect
+                      ? 'bg-red-50 border-red-300'
+                      : 'border-slate-200 hover:bg-slate-50'
+                  } ${!showResults ? 'cursor-pointer' : ''}`}
+                >
+                  <RadioGroupItem value={index.toString()} id={`q${questionNumber}-choice${index}`} />
+                  <span className="flex-1 text-slate-700">
+                    {choice}
+                  </span>
+                  {isThisCorrect && (
+                    <span className="text-sm font-semibold text-green-700">✓ Correct</span>
+                  )}
+                  {isThisIncorrect && (
+                    <span className="text-sm font-semibold text-red-700">✗ Your answer</span>
+                  )}
+                </Label>
+              );
+            })}
+          </div>
+        </RadioGroup>
+
+        {showResults && question.explanation && (
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+            <p className="text-sm font-semibold text-blue-900 mb-1">Explanation:</p>
+            <p className="text-sm text-blue-800 leading-relaxed">{question.explanation}</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

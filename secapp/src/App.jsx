@@ -1,27 +1,62 @@
-import { Routes, Route } from "react-router-dom";
-import Layout from "./Layout.jsx";
-import Home from "@/pages/Home.jsx";
-import Lessons from "@/pages/Lessons.jsx";
-import LessonDetail from "@/pages/LessonDetail.jsx";
-import TakeQuiz from "@/pages/TakeQuiz.jsx";
-import Progress from "@/pages/Progress.jsx";
-import AboutCertification from "@/pages/AboutCertification.jsx";
-import AdminContentManager from "@/pages/AdminContentManager.jsx";
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Layout from './Layout';
+import Home from './pages/Home';
+import AboutCertification from './pages/AboutCertification';
+import Lessons from './pages/Lessons';
+import LessonDetail from './pages/LessonDetail';
+import Progress from './pages/Progress';
+import AdminContentManager from './pages/AdminContentManager';
+import TakeQuiz from './pages/TakeQuiz';
 
-function App() {
+export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Layout />}>
-        <Route index element={<Home />} />
-        <Route path="lessons" element={<Lessons />} />
-        <Route path="lessons/:lessonId" element={<LessonDetail />} />
-        <Route path="quiz" element={<TakeQuiz />} />
-        <Route path="progress" element={<Progress />} />
-        <Route path="about-certification" element={<AboutCertification />} />
-        <Route path="admin" element={<AdminContentManager />} />
-      </Route>
-    </Routes>
+    <BrowserRouter>
+      <Routes>
+
+        {/* Home */}
+        <Route 
+          path="/" 
+          element={<Layout currentPageName="Home"><Home /></Layout>} 
+        />
+
+        {/* About */}
+        <Route 
+          path="/about" 
+          element={<Layout currentPageName="AboutCertification"><AboutCertification /></Layout>} 
+        />
+
+        {/* Lessons */}
+        <Route 
+          path="/lessons" 
+          element={<Layout currentPageName="Lessons"><Lessons /></Layout>} 
+        />
+
+        {/* Single Lesson */}
+        <Route 
+          path="/lesson/:id" 
+          element={<Layout currentPageName="LessonDetail"><LessonDetail /></Layout>} 
+        />
+
+        {/* Progress */}
+        <Route 
+          path="/progress" 
+          element={<Layout currentPageName="Progress"><Progress /></Layout>} 
+        />
+
+        {/* Resources */}
+        <Route 
+          path="/resources" 
+          element={<Layout currentPageName="AdminContentManager"><AdminContentManager /></Layout>} 
+        />
+
+        {/* Quiz */}
+        <Route 
+          path="/quiz" 
+          element={<Layout currentPageName="TakeQuiz"><TakeQuiz /></Layout>} 
+        />
+
+      </Routes>
+    </BrowserRouter>
   );
 }
-
-export default App;
