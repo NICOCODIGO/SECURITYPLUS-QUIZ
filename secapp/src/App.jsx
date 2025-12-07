@@ -1,3 +1,4 @@
+// src/App.jsx
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './Layout';
@@ -17,43 +18,81 @@ export default function App() {
         {/* Home */}
         <Route 
           path="/" 
-          element={<Layout currentPageName="Home"><Home /></Layout>} 
+          element={
+            <Layout currentPageName="Home">
+              <Home />
+            </Layout>
+          } 
         />
 
         {/* About */}
         <Route 
           path="/about" 
-          element={<Layout currentPageName="AboutCertification"><AboutCertification /></Layout>} 
+          element={
+            <Layout currentPageName="AboutCertification">
+              <AboutCertification />
+            </Layout>
+          } 
         />
 
         {/* Lessons */}
         <Route 
           path="/lessons" 
-          element={<Layout currentPageName="Lessons"><Lessons /></Layout>} 
+          element={
+            <Layout currentPageName="Lessons">
+              <Lessons />
+            </Layout>
+          } 
         />
 
         {/* Single Lesson */}
         <Route 
           path="/lesson/:id" 
-          element={<Layout currentPageName="LessonDetail"><LessonDetail /></Layout>} 
+          element={
+            <Layout currentPageName="LessonDetail">
+              <LessonDetail />
+            </Layout>
+          } 
         />
 
         {/* Progress */}
         <Route 
           path="/progress" 
-          element={<Layout currentPageName="Progress"><Progress /></Layout>} 
+          element={
+            <Layout currentPageName="Progress">
+              <Progress />
+            </Layout>
+          } 
         />
 
         {/* Resources */}
         <Route 
           path="/resources" 
-          element={<Layout currentPageName="AdminContentManager"><AdminContentManager /></Layout>} 
+          element={
+            <Layout currentPageName="AdminContentManager">
+              <AdminContentManager />
+            </Layout>
+          } 
         />
 
-        {/* Quiz */}
+        {/* Quiz route (existing /quiz path) */}
         <Route 
           path="/quiz" 
-          element={<Layout currentPageName="TakeQuiz"><TakeQuiz /></Layout>} 
+          element={
+            <Layout currentPageName="TakeQuiz">
+              <TakeQuiz />
+            </Layout>
+          } 
+        />
+
+        {/* Quiz route used by Start Quiz buttons: /TakeQuiz?… */}
+        <Route 
+          path="/TakeQuiz" 
+          element={
+            <Layout currentPageName="TakeQuiz">
+              <TakeQuiz />
+            </Layout>
+          } 
         />
 
       </Routes>
