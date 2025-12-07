@@ -1,3 +1,6 @@
+//this is for the "Quiz Center" sidebar component, the reason it has its own 
+// file is to keep things modular and clean, otherwise the main quiz page
+// would be too cluttered and too long with sidebar code
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { BookOpen, Target, FileText } from 'lucide-react';
