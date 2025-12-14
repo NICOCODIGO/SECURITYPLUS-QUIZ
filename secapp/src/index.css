@@ -2,8 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-
-
+/* ----------------------------------------
+   DEFAULT ROOT STYLES (SAFE)
+---------------------------------------- */
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -28,17 +29,18 @@ a:hover {
   color: #ffffff;
 }
 
-/* full tailwind control */
 body {
   margin: 0;
-} 
-
+}
 
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
 }
 
+/* ----------------------------------------
+   GLOBAL BUTTON STYLING (SAFE)
+---------------------------------------- */
 button {
   border-radius: 8px;
   border: 1px solid transparent;
@@ -50,14 +52,19 @@ button {
   cursor: pointer;
   transition: border-color 0.25s;
 }
+
 button:hover {
-  border-color: #f1f5f9
+  border-color: #f1f5f9;
 }
+
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+/* ----------------------------------------
+   LIGHT MODE (SAFE)
+---------------------------------------- */
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;
@@ -71,8 +78,9 @@ button:focus-visible {
   }
 }
 
-
-
+/* ----------------------------------------
+   TAILWIND THEME TOKENS
+---------------------------------------- */
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -101,6 +109,7 @@ button:focus-visible {
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
   }
+
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
@@ -129,13 +138,36 @@ button:focus-visible {
   }
 }
 
-
-
+/* ----------------------------------------
+   BASE (SAFE)
+---------------------------------------- */
 @layer base {
-  * {
-    @apply border-border;
-  }
+  /* ❌ Removed the rule that broke everything:
+     * {
+         @apply border-border;
+       }
+     It was forcing borders on ALL elements including Radix radio.
+  */
+
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ----------------------------------------
+   ✅ FIX SHADCN RADIO BUTTONS
+---------------------------------------- */
+button[data-state][role="radio"] {
+  padding: 0 !important;
+  border-radius: 50% !important;
+  width: 20px !important;
+  height: 20px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0 !important;
+}
+
+button[data-state][role="radio"] > span {
+  border-radius: 50% !important;
 }

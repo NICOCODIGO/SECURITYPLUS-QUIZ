@@ -393,23 +393,32 @@ export default function TakeQuiz() {
         )}
       </div>
 
-      <div className="flex gap-2 flex-wrap max-h-32 overflow-y-auto p-2 bg-slate-50 rounded-lg border-2 border-slate-200">
-        {questions.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => setCurrentQuestionIndex(index)}
-            className={`w-10 h-10 rounded-lg font-medium transition-all flex-shrink-0 ${
-              index === currentQuestionIndex
-                ? 'bg-red-600 text-white'
-                : selectedAnswers[index] !== undefined
-                ? 'bg-green-100 text-green-700 border-2 border-green-300'
-                : 'bg-white text-slate-600 border-2 border-slate-200'
-            }`}
-          >
-            {index + 1}
-          </button>
-        ))}
-      </div>
+      <div className="flex gap-2 flex-wrap p-4 bg-white rounded-xl border-2 border-slate-200 justify-center shadow-sm">
+  {questions.map((_, index) => {
+    const isActive = index === currentQuestionIndex;
+    const isAnswered = selectedAnswers[index] !== undefined;
+
+    return (
+      <button
+        key={index}
+        onClick={() => setCurrentQuestionIndex(index)}
+        className={`
+          w-10 h-10 flex items-center justify-center rounded-lg font-medium border transition-all
+          ${
+            isActive
+              ? "bg-red-600 text-white border-red-600"
+              : isAnswered
+              ? "bg-green-50 text-green-700 border-green-300"
+              : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+          }
+        `}
+      >
+        {index + 1}
+      </button>
+    );
+  })}
+</div>
+
 
       <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>
         <AlertDialogContent>
