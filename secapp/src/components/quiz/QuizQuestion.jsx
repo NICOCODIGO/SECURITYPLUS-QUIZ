@@ -63,50 +63,57 @@ export default function QuizQuestion({
               const isThisIncorrect =
                 showResults && isThisSelected && !isThisCorrect;
 
-              return (
+                return (
                 <Label
                   key={index}
                   htmlFor={`q${questionNumber}-choice${index}`}
                   className={`
-                    flex items-center gap-4 p-4 rounded-lg border transition-all
-                    ${
-                      isThisCorrect
-                        ? "bg-green-50 border-green-300"
-                        : isThisIncorrect
-                        ? "bg-red-50 border-red-300"
-                        : "border-slate-300 hover:bg-slate-50"
-                    }
-                    ${showResults ? "cursor-default" : "cursor-pointer"}
+                  flex items-center gap-4 p-4 rounded-lg border transition-all
+                  ${
+                    isThisCorrect
+                    ? "bg-green-50 border-green-300"
+                    : isThisIncorrect
+                    ? "bg-red-50 border-red-300"
+                    : "border-slate-300 hover:bg-slate-50"
+                  }
+                  ${showResults ? "cursor-default" : "cursor-pointer"}
                   `}
                 >
                   {/* Final perfect circle radio button */}
                   <RadioGroupItem
-                    value={index.toString()}
-                    id={`q${questionNumber}-choice${index}`}
-                    disabled={showResults}
-                    className="
-                      h-5 w-5 rounded-full border border-slate-400
-                      data-[state=checked]:bg-red-600 
-                      data-[state=checked]:border-red-600
-                    "
-                  />
+  value={index.toString()}
+  id={`q${questionNumber}-choice${index}`}
+  disabled={showResults}
+  className="
+    relative h-5 w-5 rounded-full
+    border border-slate-400
+    data-[state=checked]:border-slate-500
+    data-[state=checked]:bg-slate-200
+
+    [&_span]:h-2.5
+    [&_span]:w-2.5
+    [&_span]:rounded-full
+    [&_span]:bg-slate-600
+  "
+/>
+
 
                   {/* Answer Text */}
                   <span className="flex-1 text-slate-700">{choice}</span>
 
                   {isThisCorrect && (
-                    <span className="text-sm font-semibold text-green-700">
-                      ✓ Correct
-                    </span>
+                  <span className="text-sm font-semibold text-green-700">
+                    ✓ Correct
+                  </span>
                   )}
 
                   {isThisIncorrect && (
-                    <span className="text-sm font-semibold text-red-700">
-                      ✗ Your answer
-                    </span>
+                  <span className="text-sm font-semibold text-red-700">
+                    ✗ Your answer
+                  </span>
                   )}
                 </Label>
-              );
+                );
             })}
           </div>
         </RadioGroup>

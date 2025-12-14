@@ -83,14 +83,14 @@ export default function DomainQuiz({ domain, questions }) {
             <h3 className="text-sm font-semibold text-slate-700 mb-3">Number of Questions</h3>
             <input
               type="range"
-              min="1"
+              min="10"
               max="90"
               value={questionCount}
               onChange={(e) => setQuestionCount(parseInt(e.target.value))}
               className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-red-600"
             />
             <div className="flex justify-between items-center mt-2">
-              <span className="text-xs text-slate-500">1</span>
+              <span className="text-xs text-slate-500">10</span>
               <span className="text-lg font-bold text-red-600">{questionCount}</span>
               <span className="text-xs text-slate-500">90</span>
             </div>
