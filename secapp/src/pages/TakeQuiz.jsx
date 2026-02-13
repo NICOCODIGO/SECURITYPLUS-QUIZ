@@ -37,6 +37,7 @@ export default function TakeQuiz() {
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [quizStartTime, setQuizStartTime] = useState(null);
   const [quizCompletionTime, setQuizCompletionTime] = useState(null);
+  const [allowUnload, setAllowUnload] = useState(false);
 
   useEffect(() => {
     if (quizId) {
@@ -67,6 +68,25 @@ export default function TakeQuiz() {
     }
     return () => clearInterval(timer);
   }, [showResults, timerEnabled, timeRemaining]);
+
+  useEffect(() => {
+  // Only warn if quiz is in progress
+  const quizInProgress =
+    questions.length > 0 && !showResults;
+
+  const handleBeforeUnload = (e) => {
+    if (!quizInProgress) return;
+
+    e.preventDefault();
+    e.returnValue = ""; // Required for Chrome
+    return "";
+  };
+
+
+  return () => {
+    window.removeEventListener("beforeunload", handleBeforeUnload);
+  };
+}, [questions.length, showResults, allowUnload]);
 
 
 
@@ -147,8 +167,11 @@ export default function TakeQuiz() {
   };
 
   const confirmExit = () => {
+    setAllowUnload(true); //allow intentional exit
+
     const section = returnTo || domainId || 'dashboard';
     window.location.href = createPageUrl('Lessons') + `?section=${section}`;
+    
   };
 
   const calculateScore = () => {
