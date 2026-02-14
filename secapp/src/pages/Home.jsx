@@ -1,4 +1,8 @@
 import React from 'react';
+import hourglass from '../assets/home page/Hourglass.png';
+import graphfork from '../assets/home page/graphfork.png';
+import openbook from '../assets/home page/openbook.png';
+import items from '../assets/home page/items.png';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from "@/lib/utils";
 import { Button } from '@/components/ui/button';
@@ -12,10 +16,10 @@ export default function Home() {
   const completionRate = lessons.length > 0 ? Math.round((completedLessons / lessons.length) * 100) : 0;
 
   const features = [
-    { icon: Shield, title: 'Comprehensive Content', description: 'Master all Security+ exam objectives' },
-    { icon: Lock, title: 'Interactive Quizzes', description: 'Test your knowledge with practice questions' },
-    { icon: Globe, title: 'Real-World Scenarios', description: 'Learn through practical examples' },
-    { icon: BarChart3, title: 'Track Progress', description: 'Monitor your learning journey' },
+    { icon: openbook, title: 'Practice Exams', description: 'Full-length simulated exams that mirror the real SY0-701 test environment with the same format, difficulty, and time constraints.' },
+    { icon: items, title: 'Domain Breakdown', description: 'Targeted practice for each Security+ domain with weighted questions that match the official exam distribution.' },
+    { icon: hourglass, title: 'Realistic Exam Mode', description: 'Timed practice sessions with the exact 90-minute format, instant scoring, and comprehensive explanations for every question.' },
+    { icon: graphfork, title: 'Exam Analytics', description: 'Track your progress across all five domains with detailed insights into strengths, weaknesses, and improvement trends over time.' },
   ];
 
   const topics = [
@@ -108,25 +112,35 @@ export default function Home() {
           <CardContent className="p-12 space-y-8">
             
             <div className="text-center">
-              <h2 className="text-4xl font-black text-slate-900 uppercase">Why Choose EduPrep?</h2>
-              <p className="text-lg text-slate-600 mt-3">Everything you need to pass your Security+ exam</p>
+              <h2 className="text-4xl font-black text-slate-900 uppercase">Everything You Need to Pass</h2>
+              <p className="text-lg text-slate-600 mt-3">Comprehensive tools and resources designed to help you master every aspect of the Security+ exam</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {features.map((feature, i) => {
-                const Icon = feature.icon;
-                return (
-                  <Card key={i} className="border-2 border-slate-200 hover:border-red-600 hover:shadow-xl transition-all bg-slate-50 rounded-2xl">
-                    <CardContent className="p-6 text-center space-y-3">
-                      <div className="w-16 h-16 bg-red-600 rounded-xl flex items-center justify-center mx-auto shadow-lg">
-                        <Icon className="w-8 h-8 text-white" />
-                      </div>
-                      <h3 className="font-bold text-slate-900 text-lg">{feature.title}</h3>
-                      <p className="text-sm text-slate-600">{feature.description}</p>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+              {features.map((feature, i) => (
+                <Card
+                  key={i}
+                  className="border-2 border-slate-200 hover:border-red-600 hover:shadow-xl transition-all bg-slate-50 rounded-2xl"
+                >
+                  <CardContent className="p-6 text-center space-y-3">
+                    <div className="w-16 h-16 bg-red-600 rounded-xl flex items-center justify-center mx-auto shadow-lg">
+                      <img
+                        src={feature.icon}
+                        alt=""
+                        className="w-9 h-9 object-contain"
+                      />
+                    </div>
+
+                    <h3 className="font-bold text-slate-900 text-lg">
+                      {feature.title}
+                    </h3>
+
+                    <p className="text-sm text-slate-600">
+                      {feature.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
           </CardContent>
