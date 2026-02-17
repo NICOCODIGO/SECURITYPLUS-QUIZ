@@ -35,10 +35,10 @@ export default function Home() {
 
       {/* Hero Section */}
       <section className="relative text-center space-y-8 py-24 px-4 sm:px-6 lg:px-8 overflow-hidden rounded-xl">
-        
+
         {/* Background */}
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-red-900 to-slate-800 opacity-95"></div>
-        <div 
+        <div
           className="absolute inset-0 opacity-20"
           style={{
             backgroundImage: 'url(https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=1920&q=80)',
@@ -110,7 +110,7 @@ export default function Home() {
       <section className="space-y-8 max-w-7xl mx-auto px-4">
         <Card className="border-2 border-red-600 shadow-xl rounded-3xl overflow-hidden">
           <CardContent className="p-12 space-y-8">
-            
+
             <div className="text-center">
               <h2 className="text-4xl font-black text-slate-900 uppercase">Everything You Need to Pass</h2>
               <p className="text-lg text-slate-600 mt-3">Comprehensive tools and resources designed to help you master every aspect of the Security+ exam</p>
@@ -123,11 +123,11 @@ export default function Home() {
                   className="border-2 border-slate-200 hover:border-red-600 hover:shadow-xl transition-all bg-slate-50 rounded-2xl"
                 >
                   <CardContent className="p-6 text-center space-y-3">
-                    <div className="w-16 h-16 bg-red-600 rounded-xl flex items-center justify-center mx-auto shadow-lg">
+                    <div className="w-16 h-16 rounded-xl flex items-center justify-center mx-auto">
                       <img
                         src={feature.icon}
                         alt=""
-                        className="w-9 h-9 object-contain"
+                        className="w-12 h-12 object-contain"
                       />
                     </div>
 
@@ -148,20 +148,85 @@ export default function Home() {
       </section>
 
       {/* Topics Section */}
-      <section className="bg-slate-100 rounded-2xl p-12 space-y-8 max-w-7xl mx-auto px-4">
-        <div>
-          <h2 className="text-3xl font-bold text-slate-900">What You'll Learn</h2>
-          <p className="text-slate-600 mt-2">Comprehensive coverage of all Security+ domains</p>
+      <section className="bg-slate-100 rounded-2xl p-12 space-y-10 max-w-screen-2xl mx-auto px-4">
+        {/* Header */}
+        <div className="text-center space-y-2">
+          <h2 className="text-3xl md:text-4xl font-black text-slate-900">
+            What You'll Learn
+          </h2>
+          <p className="text-slate-600 max-w-2xl mx-auto">
+            Master all five domains of the CompTIA Security+ SY0-701 exam with weighted practice questions
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
-          {topics.map((topic, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-4 h-4 text-white" />
-              </div>
-              <span className="text-slate-900">{topic}</span>
-            </div>
+        {/* Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-x-8 gap-y-16 justify-items-center">
+          {[
+            {
+              domain: 'Domain 1.0',
+              weight: '12%',
+              title: 'General Security Concepts',
+              topics: 'CIA Triad, Authentication, Cryptography Basics, Security Controls',
+            },
+            {
+              domain: 'Domain 2.0',
+              weight: '22%',
+              title: 'Threats, Vulnerabilities, and Mitigations',
+              topics: 'Malware, Attacks, Vulnerability Management, Threat Intelligence',
+            },
+            {
+              domain: 'Domain 3.0',
+              weight: '18%',
+              title: 'Security Architecture',
+              topics: 'Network Security, Cloud Security, Infrastructure Security',
+            },
+            {
+              domain: 'Domain 4.0',
+              weight: '28%',
+              title: 'Security Operations',
+              topics: 'Monitoring, Incident Response, Digital Forensics, SIEM',
+            },
+            {
+              domain: 'Domain 5.0',
+              weight: '20%',
+              title: 'Security Program Management',
+              topics: 'Governance, Risk Management, Compliance, Privacy',
+            },
+          ].map((d, i) => (
+            <Card
+              key={i}
+              className={`relative w-full max-w-sm bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow
+                lg:col-span-2
+                ${i === 3 ? 'lg:col-start-2' : ''}
+                ${i === 4 ? 'lg:col-start-4' : ''}
+  `           }
+            >
+              <CardContent className="pt-14 pb-4 px-8 text-center space-y-3">  {/* Change pb-6 to pb-4 */}
+                {/* Floating icon */}
+                <div className="absolute left-1/2 -top-8 -translate-x-1/2">
+                  <div className="w-16 h-16 rounded-full bg-white border-4 border-red-600 shadow-md flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-full bg-slate-200" />
+                  </div>
+                </div>
+
+                <p className="text-sm font-semibold text-slate-500">{d.domain}</p>
+
+                <h3 className="text-xl font-black text-slate-900 leading-snug">
+                  {d.title}
+                </h3>
+
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  {d.topics}
+                </p>
+
+                {/* Weight badge */}
+<div className="pt-2">
+  <span className="text-xs font-bold text-red-700 bg-red-100 border border-red-200 px-4 py-1.5 rounded-full">
+    {d.weight} of Exam
+  </span>
+</div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </section>
