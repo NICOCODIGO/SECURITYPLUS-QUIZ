@@ -2,44 +2,13 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TrendingDown, AlertCircle } from 'lucide-react';
+import { getDomainPerformance } from '../data/quizHistoryData';
 import { createPageUrl } from "@/lib/utils";
 
 export default function WeakestSubjectQuiz({ allQuestions }) {
-  // Get quiz history from localStorage
-  const getQuizHistory = () => {
-    const history = localStorage.getItem('quiz_history');
-    return history ? JSON.parse(history) : [];
-  };
-
-  // Calculate domain performance
-  const calculateDomainScores = () => {
-    const history = getQuizHistory();
-    const domainStats = {};
-
-    history.forEach(quiz => {
-      if (quiz.domainBreakdown) {
-        quiz.domainBreakdown.forEach(domain => {
-          if (!domainStats[domain.domain]) {
-            domainStats[domain.domain] = { total: 0, correct: 0, count: 0 };
-          }
-          domainStats[domain.domain].total += domain.total;
-          domainStats[domain.domain].correct += domain.correct;
-          domainStats[domain.domain].count += 1;
-        });
-      }
-    });
-
-    // Calculate average percentage for each domain
-    const domainScores = Object.entries(domainStats).map(([domain, stats]) => ({
-      domain,
-      percentage: Math.round((stats.correct / stats.total) * 100),
-      questionsAttempted: stats.total,
-    }));
-
-    return domainScores.sort((a, b) => a.percentage - b.percentage);
-  };
-
-  const domainScores = calculateDomainScores();
+  // Shared with the Progress dashboard so the two can never disagree about
+  // which domain is weakest. `ranked` is already sorted weakest-first.
+  const domainScores = getDomainPerformance().ranked;
   const weakestDomain = domainScores[0];
   const hasHistory = domainScores.length > 0;
 
@@ -50,7 +19,7 @@ export default function WeakestSubjectQuiz({ allQuestions }) {
     }
 
     // Filter questions from the weakest domain
-    const weakestQuestions = allQuestions.filter(q => q.domain === weakestDomain.domain);
+    const weakestQuestions = allQuestions.filter(q => q.domain === weakestDomain.label);
     
     // Shuffle and select up to 20 questions
     const shuffled = [...weakestQuestions].sort(() => Math.random() - 0.5);
@@ -59,8 +28,8 @@ export default function WeakestSubjectQuiz({ allQuestions }) {
     const quizId = `weakest_${Date.now()}`;
     sessionStorage.setItem(quizId, JSON.stringify(selectedQuestions));
 
-    window.location.href = createPageUrl('TakeQuiz') + 
-      `?type=weakest&domain=${encodeURIComponent(weakestDomain.domain)}&timer=false&quizId=${quizId}&returnTo=dashboard`;
+    window.location.href = createPageUrl('TakeQuiz') +
+      `?type=weakest&domain=${encodeURIComponent(weakestDomain.title)}&timer=false&quizId=${quizId}&returnTo=dashboard`;
   };
 
   return (
@@ -94,12 +63,12 @@ export default function WeakestSubjectQuiz({ allQuestions }) {
                   <TrendingDown className="w-8 h-8 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-xl font-bold text-slate-900 mb-1">{weakestDomain.domain}</h3>
+                  <h3 className="text-xl font-bold text-slate-900 mb-1">{weakestDomain.title}</h3>
                   <p className="text-slate-600 mb-2">
-                    Current Score: <span className="font-bold text-orange-600">{weakestDomain.percentage}%</span>
+                    Current Score: <span className="font-bold text-orange-600">{weakestDomain.accuracy}%</span>
                   </p>
                   <p className="text-sm text-slate-600">
-                    Based on {weakestDomain.questionsAttempted} questions attempted
+                    Based on {weakestDomain.total} questions attempted
                   </p>
                 </div>
               </div>
@@ -120,15 +89,15 @@ export default function WeakestSubjectQuiz({ allQuestions }) {
               <div className="space-y-3">
                 {domainScores.map((domain, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border-2 border-slate-200">
-                    <span className="text-sm font-medium text-slate-700">{domain.domain}</span>
+                    <span className="text-sm font-medium text-slate-700">{domain.title}</span>
                     <div className="flex items-center gap-3">
-                      <span className="text-xs text-slate-600">{domain.questionsAttempted} questions</span>
+                      <span className="text-xs text-slate-600">{domain.total} questions</span>
                       <span className={`text-sm font-bold px-3 py-1 rounded-full ${
-                        domain.percentage >= 80 ? 'bg-green-100 text-green-700' :
-                        domain.percentage >= 60 ? 'bg-yellow-100 text-yellow-700' :
+                        domain.accuracy >= 80 ? 'bg-green-100 text-green-700' :
+                        domain.accuracy >= 60 ? 'bg-yellow-100 text-yellow-700' :
                         'bg-red-100 text-red-700'
                       }`}>
-                        {domain.percentage}%
+                        {domain.accuracy}%
                       </span>
                     </div>
                   </div>

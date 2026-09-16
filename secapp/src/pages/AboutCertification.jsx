@@ -1,287 +1,234 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { createPageUrl } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Shield, TrendingUp, BookOpen, Award, CheckCircle2, Clock, Users, Target } from 'lucide-react';
+import {
+  Shield,
+  BookOpen,
+  CheckCircle2,
+  Clock,
+  Target,
+  Users,
+  Briefcase,
+  RefreshCw,
+} from 'lucide-react';
+import DomainGrid from '../components/domains/DomainGrid';
+
+const stats = [
+  { value: '130%',    label: 'Higher Salary Potential',      sub: 'vs. non-certified peers' },
+  { value: '90 min',  label: 'Exam Duration',                sub: 'timed, performance-based' },
+  { value: '750/900', label: 'Passing Score',                sub: 'scaled score required' },
+  { value: '90',      label: 'Max Questions',                sub: 'multiple-choice & PBQ' },
+];
+
+const whoIsItFor = [
+  { icon: Briefcase, label: 'IT professionals moving into security roles' },
+  { icon: RefreshCw, label: 'Career changers entering cybersecurity' },
+  { icon: Shield,    label: 'Government & military IT personnel (DoD 8570)' },
+  { icon: Users,     label: 'Help desk / sysadmin looking to level up' },
+];
+
+const skills = [
+  'Identify and defend against cyber threats, malware, and social engineering',
+  'Configure firewalls, intrusion detection systems, and endpoint protection',
+  'Design secure network architectures for cloud and on-premises environments',
+  'Manage identity, authentication methods, and access controls',
+  'Assess organizational risk and develop mitigation strategies',
+  'Apply encryption and cryptography to protect sensitive data',
+  'Implement security policies and maintain regulatory compliance',
+];
 
 export default function AboutCertification() {
-  const examDomains = [
-    {
-      number: '1.0',
-      title: 'General Security Concepts',
-      percentage: '12%',
-      topics: [
-        'Understanding different types of security controls (technical, physical, administrative)',
-        'Core security principles: Confidentiality, Integrity, Availability (CIA)',
-        'Authentication and authorization fundamentals',
-        'Cryptography basics including encryption, hashing, and digital signatures',
-      ],
-    },
-    {
-      number: '2.0',
-      title: 'Threats, Vulnerabilities, and Mitigations',
-      percentage: '22%',
-      topics: [
-        'Identifying threat actors from nation-states to insider threats',
-        'Understanding attack vectors like phishing, malware, and social engineering',
-        'Recognizing vulnerabilities in applications, networks, and systems',
-        'Implementing security measures to prevent and mitigate attacks',
-      ],
-    },
-    {
-      number: '3.0',
-      title: 'Security Architecture',
-      percentage: '18%',
-      topics: [
-        'Designing secure network architectures for cloud and on-premises',
-        'Protecting data through encryption, classification, and access controls',
-        'Building resilient systems with backups and disaster recovery plans',
-        'Implementing secure infrastructure for IoT and industrial systems',
-      ],
-    },
-    {
-      number: '4.0',
-      title: 'Security Operations',
-      percentage: '28%',
-      topics: [
-        'Managing security for mobile devices, applications, and networks',
-        'Monitoring and responding to security incidents effectively',
-        'Implementing identity management with multi-factor authentication',
-        'Using security tools like firewalls, intrusion detection, and endpoint protection',
-      ],
-    },
-    {
-      number: '5.0',
-      title: 'Security Program Management and Oversight',
-      percentage: '20%',
-      topics: [
-        'Creating security policies, procedures, and governance frameworks',
-        'Assessing and managing organizational security risks',
-        'Ensuring compliance with regulations and industry standards',
-        'Building security awareness programs and conducting audits',
-      ],
-    },
-  ];
-
-  const careerBenefits = [
-    { icon: TrendingUp, title: 'Higher Salary Potential', description: '130% higher median salary for tech professionals with certifications' },
-    { icon: Users, title: 'In-Demand Skills', description: '7 in 10 companies recognize digital skills as critical for success' },
-    { icon: Award, title: 'Industry Recognition', description: 'Globally recognized certification trusted by employers worldwide' },
-    { icon: Target, title: 'Career Advancement', description: 'Opens doors to security analyst, administrator, and specialist roles' },
-  ];
-
-  const examDetails = [
-    { label: 'Exam Version', value: 'V7 (SY0-701)' },
-    { label: 'Questions', value: 'Maximum 90 questions' },
-    { label: 'Duration', value: '90 minutes' },
-    { label: 'Passing Score', value: '750 out of 900' },
-    { label: 'Question Types', value: 'Multiple-choice & Performance-based' },
-    { label: 'Languages', value: 'English, Japanese, Portuguese, Spanish, Thai' },
-  ];
-
-  const skillsLearned = [
-    'Identify and defend against cyber threats, malware, and social engineering attacks',
-    'Configure and manage security technologies including firewalls and intrusion detection systems',
-    'Design secure network architectures and implement protective protocols',
-    'Manage user identities, authentication methods, and access controls',
-    'Assess organizational risks and develop mitigation strategies',
-    'Apply encryption and cryptography to protect sensitive data',
-    'Implement security policies and maintain compliance with industry standards',
-  ];
-
   return (
-    <div className="space-y-12">
-      {/* Hero Section */}
-      <section className="relative text-center space-y-6 py-20 rounded-2xl overflow-hidden border-2 border-red-200">
-        <div className="absolute inset-0 bg-gradient-to-br from-red-600 via-slate-800 to-slate-900 opacity-95"></div>
-        <div 
+    <div className="relative space-y-16 -mt-8">
+
+      {/* ── Hero ─────────────────────────────────────────── */}
+      <section className="relative text-center space-y-6 py-24 px-4 sm:px-6 lg:px-8 overflow-hidden rounded-xl">
+        <div className="absolute inset-0 bg-gradient-to-br from-comptia-charcoal via-comptia-charcoal-light to-comptia-charcoal" />
+        <div
           className="absolute inset-0 opacity-20"
           style={{
-            backgroundImage: 'url(https://images.unsplash.com/photo-1563986768609-322da13575f3?w=1200)',
+            backgroundImage: 'url(https://images.unsplash.com/photo-1563986768609-322da13575f3?w=1920&q=80)',
             backgroundSize: 'cover',
-            backgroundPosition: 'center'
+            backgroundPosition: 'center',
           }}
-        ></div>
-        <div className="relative z-10 space-y-6 px-4">
-          <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-5 py-2.5 rounded-full border border-white/30">
+        />
+        <div className="relative z-10 max-w-4xl mx-auto space-y-6">
+          <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-5 py-2.5 rounded-full border-2 border-white/30">
             <Shield className="w-5 h-5 text-white" />
-            <span className="text-sm font-bold text-white uppercase tracking-wide">CompTIA Security+ Certification</span>
+            <span className="text-sm font-bold text-white uppercase tracking-wide">CompTIA Security+ SY0-701</span>
           </div>
-          
-          <h1 className="text-5xl md:text-6xl font-black text-white uppercase tracking-tight">
-            About the Certification
+
+          <h1 className="text-5xl md:text-7xl font-black text-white uppercase tracking-tight leading-tight">
+            About the <br />
+            <span className="text-red-400">Certification</span>
           </h1>
-          
-          <p className="text-xl text-white/95 max-w-3xl mx-auto leading-relaxed font-medium">
-            Security+ is the industry-standard certification that validates your cybersecurity knowledge and proves you have the skills to protect organizations from threats.
+
+          <p className="text-xl text-white/90 max-w-3xl mx-auto leading-relaxed">
+            Security+ is the industry's first security certification IT professionals should earn — vendor-neutral, globally recognized, and trusted by employers worldwide.
           </p>
+
+          <Link to="/lessons">
+            <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white px-10 py-7 text-lg font-bold rounded-lg uppercase tracking-wide shadow-xl mt-4">
+              Start Practising Now
+            </Button>
+          </Link>
         </div>
       </section>
 
-      {/* What is Security+ */}
-      <section className="space-y-6">
-        <div className="text-center">
-          <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tight">What is Security+?</h2>
-        </div>
-        
-        <Card className="border-2 border-red-600 shadow-xl bg-white">
-          <CardContent className="p-8 space-y-4">
-            <p className="text-lg text-slate-700 leading-relaxed text-center">
-              CompTIA Security+ is a globally recognized certification that establishes the foundational knowledge required to pursue a career in cybersecurity. It's the first security certification IT professionals should earn, covering essential security principles and practices.
-            </p>
-            <p className="text-lg text-slate-700 leading-relaxed text-center">
-              This certification proves you can assess enterprise security, identify vulnerabilities, implement security solutions, and respond to incidents. It's vendor-neutral, meaning the skills you learn apply to any technology environment.
-            </p>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* Career Benefits */}
-      <section className="space-y-8">
-        <Card className="border-2 border-red-600 shadow-xl rounded-3xl overflow-hidden">
-          <CardContent className="p-12 space-y-8">
-            <div className="text-center max-w-7xl mx-auto">
-              <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tight">Why Get Certified?</h2>
-              <p className="text-slate-600 mt-3 text-lg font-medium">Transform your career with industry-recognized credentials</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
-          {careerBenefits.map((benefit, index) => {
-            const Icon = benefit.icon;
-            return (
-              <Card key={index} className="border-2 border-slate-200 hover:shadow-xl hover:border-red-600 transition-all bg-slate-50 rounded-2xl">
-                <CardContent className="p-6 text-center space-y-3">
-                  <div className="w-16 h-16 bg-red-600 rounded-xl flex items-center justify-center mx-auto shadow-lg">
-                    <Icon className="w-8 h-8 text-white" />
-                  </div>
-                  <h3 className="font-bold text-slate-900 text-lg">{benefit.title}</h3>
-                  <p className="text-sm text-slate-600 leading-relaxed">{benefit.description}</p>
-                </CardContent>
-              </Card>
-            );
-          })}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* Exam Overview */}
-      <Card className="border-2 border-red-600 shadow-xl bg-white">
-        <CardHeader>
-          <CardTitle className="text-3xl font-black text-slate-900 uppercase tracking-tight text-center">
-            Exam Overview
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <p className="text-lg text-slate-700 leading-relaxed text-center">
-            The Security+ exam (SY0-701) tests your ability to perform core security functions and is required for many government and military IT positions. It's designed for professionals with 2 years of IT experience who want to specialize in security.
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {examDetails.map((detail, index) => (
-              <div key={index} className="bg-slate-50 rounded-lg p-4 border-2 border-slate-200">
-                <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">{detail.label}</p>
-                <p className="text-lg font-bold text-slate-900">{detail.value}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6 space-y-2">
-            <div className="flex items-center gap-3">
-              <Clock className="w-6 h-6 text-red-600" />
-              <p className="font-bold text-slate-900 text-lg">Recommended Experience</p>
-            </div>
-            <p className="text-slate-700 leading-relaxed">
-              CompTIA Network+ certification plus two years working in a security or systems administrator role. However, with dedicated study, entry-level professionals can pass this exam.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Exam Domains */}
-      <section className="space-y-6">
-        <div className="text-center">
-          <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tight">What's on the Exam</h2>
-          <p className="text-slate-600 mt-2 text-lg font-medium">Five core domains covering essential security concepts</p>
-        </div>
-
-        <div className="space-y-4">
-          {examDomains.map((domain, index) => (
-            <Card key={index} className="border-2 border-slate-200 hover:shadow-xl hover:border-red-600 transition-all bg-white">
-              <CardHeader>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Badge className="bg-red-600 text-white font-bold text-base py-1 px-3">
-                        {domain.number}
-                      </Badge>
-                      <CardTitle className="text-2xl font-black text-slate-900">
-                        {domain.title}
-                      </CardTitle>
-                    </div>
-                  </div>
-                  <Badge className="bg-slate-700 text-white font-bold text-lg py-2 px-4">
-                    {domain.percentage}
-                  </Badge>
+      {/* ── Stats Bar ────────────────────────────────────── */}
+      <section className="max-w-7xl mx-auto px-4">
+        <Card className="bg-white border-0 shadow-xl rounded-3xl overflow-hidden">
+          <CardContent className="p-10">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 divide-y-2 lg:divide-y-0 lg:divide-x-2 divide-slate-100">
+              {stats.map((s, i) => (
+                <div key={i} className="text-center pt-6 lg:pt-0 first:pt-0">
+                  <p className="text-5xl font-black text-red-600 leading-none">{s.value}</p>
+                  <p className="text-base font-bold text-comptia-charcoal mt-2">{s.label}</p>
+                  <p className="text-xs text-slate-500 mt-1">{s.sub}</p>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  {domain.topics.map((topic, topicIndex) => (
-                    <li key={topicIndex} className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                      <span className="text-slate-700 leading-relaxed">{topic}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      {/* Skills You'll Learn */}
-      <section className="bg-slate-100 rounded-2xl p-12 space-y-8">
-        <div className="text-left">
-          <h2 className="text-3xl font-bold text-slate-900">Skills You'll Master</h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
-          {skillsLearned.map((skill, index) => (
-            <div key={index} className="flex items-start gap-3">
-              <div className="w-6 h-6 bg-red-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                <CheckCircle2 className="w-4 h-4 text-white" />
-              </div>
-              <span className="text-slate-900">{skill}</span>
+              ))}
             </div>
-          ))}
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* ── What is Security+ / Who is it for ────────────── */}
+      <section className="max-w-7xl mx-auto px-4 space-y-8">
+        <div className="text-center space-y-2">
+          <h2 className="text-3xl md:text-4xl font-black text-comptia-charcoal uppercase">What is Security+?</h2>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* What it is */}
+          <Card className="border-2 border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+            <CardContent className="p-10 space-y-5">
+              <div className="w-14 h-14 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Shield className="w-7 h-7 text-white" />
+              </div>
+              <h3 className="text-2xl font-black text-comptia-charcoal">The Certification</h3>
+              <p className="text-slate-600 leading-relaxed">
+                CompTIA Security+ establishes the foundational knowledge required for a career in cybersecurity. It proves you can assess enterprise security, identify vulnerabilities, implement solutions, and respond to incidents.
+              </p>
+              <p className="text-slate-600 leading-relaxed">
+                It's vendor-neutral — skills you learn apply to any technology environment — and is required for many government and military IT positions under DoD 8570.
+              </p>
+              <div className="bg-red-50 border-2 border-red-100 rounded-xl p-4 flex items-start gap-3">
+                <Clock className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-slate-700">
+                  <span className="font-bold">Recommended:</span> CompTIA Network+ plus two years in a security or sysadmin role — but dedicated self-study can get entry-level professionals there too.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Who is it for */}
+          <Card className="border-2 border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+            <CardContent className="p-10 space-y-5">
+              <div className="w-14 h-14 bg-comptia-charcoal rounded-2xl flex items-center justify-center shadow-lg">
+                <Target className="w-7 h-7 text-white" />
+              </div>
+              <h3 className="text-2xl font-black text-comptia-charcoal">Who Is It For?</h3>
+              <p className="text-slate-600 leading-relaxed">
+                Security+ is the right next step if any of these describe you:
+              </p>
+              <ul className="space-y-4">
+                {whoIsItFor.map((item, i) => {
+                  const Icon = item.icon;
+                  return (
+                    <li key={i} className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <Icon className="w-5 h-5 text-slate-700" />
+                      </div>
+                      <span className="text-slate-700 font-medium">{item.label}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="bg-comptia-charcoal rounded-xl p-4 text-center">
+                <p className="text-white text-sm font-medium">
+                  7 in 10 companies recognize cybersecurity credentials as critical hiring criteria.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <Card className="border-4 border-slate-300 shadow-2xl bg-red-600">
-        <CardContent className="p-12 text-white text-center space-y-6">
-          <h2 className="text-4xl font-black uppercase tracking-tight">Ready to Start Your Journey?</h2>
-          <p className="text-xl font-medium max-w-2xl mx-auto leading-relaxed">
-            Begin learning today and earn the certification that will transform your cybersecurity career
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-            <Link to={createPageUrl('Lessons')}>
-              <Button size="lg" className="bg-white text-red-600 hover:bg-slate-100 px-10 py-7 text-lg font-bold rounded-lg shadow-xl uppercase tracking-wide">
-                <BookOpen className="w-5 h-5 mr-2" />
-                Start Learning
-              </Button>
-            </Link>
-            <Link to={createPageUrl('AdminContentManager')}>
-              <Button size="lg" variant="outline" className="bg-transparent border-2 border-white text-white hover:bg-white/10 px-10 py-7 text-lg font-bold rounded-lg uppercase tracking-wide">
-                Resources
-              </Button>
-            </Link>
+      {/* ── What's on the Exam ───────────────────────────── */}
+      <section className="space-y-8 max-w-7xl mx-auto px-4">
+        <div className="text-center space-y-3">
+          <div className="inline-flex items-center gap-2 bg-red-50 px-5 py-2.5 rounded-full border-2 border-red-200">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
+            <span className="text-sm font-bold text-red-700 uppercase tracking-wide">
+              Exam Objectives
+            </span>
           </div>
-        </CardContent>
-      </Card>
+          <h2 className="text-3xl md:text-4xl font-black text-comptia-charcoal uppercase">
+            What's on the Exam
+          </h2>
+          <p className="text-slate-600 max-w-2xl mx-auto">
+            Five domains — each with a specific weight on the real SY0-701 exam.
+          </p>
+        </div>
+
+        <Card className="border-2 border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+          <CardContent className="p-8 sm:p-12 pt-12 sm:pt-16">
+            <DomainGrid />
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* ── Skills You'll Master ─────────────────────────── */}
+      <section className="space-y-8 max-w-7xl mx-auto px-4">
+        <div className="text-center space-y-2">
+          <h2 className="text-3xl md:text-4xl font-black text-comptia-charcoal uppercase">Skills You'll Master</h2>
+          <p className="text-slate-600 max-w-2xl mx-auto">
+            Everything the exam tests, you'll be able to do on the job.
+          </p>
+        </div>
+
+        <Card className="border-2 border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+          <CardContent className="p-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {skills.map((skill, i) => (
+                <div key={i} className="flex items-start gap-4 bg-slate-50 rounded-xl p-4 border-2 border-slate-100">
+                  <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 shadow">
+                    <CheckCircle2 className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="text-slate-700 leading-relaxed">{skill}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* ── CTA ──────────────────────────────────────────── */}
+      <section className="max-w-7xl mx-auto px-4">
+        <Card className="bg-red-600 border-0 shadow-2xl rounded-3xl">
+          <CardContent className="p-16 text-white text-center space-y-6">
+            <h2 className="text-4xl md:text-5xl font-black uppercase">Ready to Start Your Journey?</h2>
+            <p className="text-xl max-w-2xl mx-auto leading-relaxed">
+              Begin learning today and earn the certification that will transform your cybersecurity career.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+              <Link to="/lessons">
+                <Button size="lg" className="bg-white text-red-600 hover:bg-slate-100 px-10 py-7 text-lg font-bold rounded-lg shadow-xl uppercase tracking-wide">
+                  <BookOpen className="w-5 h-5 mr-2" />
+                  Start Learning
+                </Button>
+              </Link>
+              <Link to="/resources">
+                <Button size="lg" variant="outline" className="bg-transparent border-2 border-white text-white hover:bg-white/10 px-10 py-7 text-lg font-bold rounded-lg uppercase tracking-wide">
+                  Resources
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
     </div>
   );
 }

@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Target, RotateCcw, Clock, ArrowLeft, FileText, ChevronDown, ChevronUp, CheckCircle2, XCircle } from 'lucide-react';
+import { Clock, ArrowLeft, Flag } from 'lucide-react';
 import QuizQuestion from '../components/quiz/QuizQuestion';
+import QuestionNavigator from '../components/quiz/QuestionNavigator';
+import QuizResults from '../components/quiz/QuizResults';
+import { saveQuizAttempt } from '../components/data/quizHistoryData';
+import { hashQuestion } from '../components/data/quizData';
+import { getFlaggedIds, toggleFlag } from '../components/data/questionPools';
 import { createPageUrl } from "@/lib/utils";
 import {
   AlertDialog,
@@ -32,12 +37,21 @@ export default function TakeQuiz() {
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [showFeedback, setShowFeedback] = useState({});
   const [showResults, setShowResults] = useState(false);
-  const [expandedQuestions, setExpandedQuestions] = useState({});
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [quizStartTime, setQuizStartTime] = useState(null);
   const [quizCompletionTime, setQuizCompletionTime] = useState(null);
   const [allowUnload, setAllowUnload] = useState(false);
+  // Mirrors the persisted flag set so the icons re-render on toggle.
+  const [flagged, setFlagged] = useState(() => getFlaggedIds());
+
+  const handleToggleFlag = (question) => {
+    toggleFlag(hashQuestion(question.question));
+    setFlagged(getFlaggedIds());
+  };
+
+  const isQuestionFlagged = (question) =>
+    question ? flagged.has(hashQuestion(question.question)) : false;
 
   useEffect(() => {
     if (quizId) {
@@ -102,16 +116,24 @@ export default function TakeQuiz() {
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // A mock exam behaves like the real thing: picking an answer only records
+  // it, the way a form does. Nothing is marked right or wrong, and answers
+  // stay changeable, until the whole exam is submitted. Practice quizzes keep
+  // their instant per-question feedback, which is the point of practising.
+  const revealsAnswersImmediately = quizType !== 'mock';
+
   const handleAnswerSelect = (answerIndex) => {
     if (!showResults) {
       setSelectedAnswers({
         ...selectedAnswers,
         [currentQuestionIndex]: answerIndex,
       });
-      setShowFeedback({
-        ...showFeedback,
-        [currentQuestionIndex]: true,
-      });
+      if (revealsAnswersImmediately) {
+        setShowFeedback({
+          ...showFeedback,
+          [currentQuestionIndex]: true,
+        });
+      }
     }
   };
 
@@ -132,17 +154,23 @@ export default function TakeQuiz() {
     setQuizCompletionTime(completionTime);
     setShowResults(true);
 
-    // Save quiz history for weakest subject tracking
-    const domainBreakdown = calculateDomainBreakdown();
-    const quizHistory = JSON.parse(localStorage.getItem('quiz_history') || '[]');
-    quizHistory.push({
+    // Save the attempt. Feeds the weakest-subject picker and the whole
+    // Progress dashboard, so it records per-question results (by hash, to
+    // keep the record small) and how long the attempt took, not just the
+    // headline score.
+    saveQuizAttempt({
       date: new Date().toISOString(),
       type: quizType || 'domain',
       score: calculateScore(),
       questionsCount: questions.length,
-      domainBreakdown: domainBreakdown,
+      durationSeconds: completionTime,
+      domainTitle: domainTitle || null,
+      domainBreakdown: calculateDomainBreakdown(),
+      answers: questions.map((q, index) => ({
+        id: hashQuestion(q.question),
+        ok: selectedAnswers[index] === q.correctAnswer,
+      })),
     });
-    localStorage.setItem('quiz_history', JSON.stringify(quizHistory));
   };
 
   const handleRetake = () => {
@@ -212,136 +240,21 @@ export default function TakeQuiz() {
   }
 
   if (showResults) {
-    const score = calculateScore();
-    const correctCount = questions.filter((q, index) => 
-      selectedAnswers[index] === q.correctAnswer
-    ).length;
-
     return (
-      <div className="max-w-4xl mx-auto space-y-6">
-        <Button variant="outline" onClick={handleExit} className="border-2">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Quizzes
-        </Button>
-
-        <Card className="border-2 border-slate-200 shadow-lg">
-          <CardHeader className="text-center space-y-4">
-            <div className={`w-16 h-16 ${quizType === 'mock' ? 'bg-red-600' : 'bg-red-600'} rounded-full flex items-center justify-center mx-auto`}>
-              {quizType === 'mock' ? <FileText className="w-8 h-8 text-white" /> : <Target className="w-8 h-8 text-white" />}
-            </div>
-            <CardTitle className="text-3xl font-bold text-slate-900">
-              {quizType === 'mock' ? 'Exam Complete' : 'Quiz Complete'}
-            </CardTitle>
-            <div>
-              <div className="text-5xl font-bold text-red-600">{score}%</div>
-              <p className="text-slate-600 mt-2">
-                {correctCount} out of {questions.length} correct
-              </p>
-              {quizCompletionTime && (
-                <p className="text-sm text-slate-500 mt-2 flex items-center justify-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  Completed in {formatTime(quizCompletionTime)}
-                </p>
-              )}
-              {quizType === 'mock' && (
-                <p className="text-sm text-slate-500 mt-1">
-                  {score >= 83 ? '✓ PASS' : '✗ FAIL'} (Passing score: 750/900 ≈ 83%)
-                </p>
-              )}
-            </div>
-          </CardHeader>
-        </Card>
-
-        {quizType === 'mock' && (
-          <Card className="border-2 border-slate-200">
-            <CardHeader>
-              <CardTitle className="text-xl font-bold text-slate-900">Domain Breakdown</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {calculateDomainBreakdown().map((item, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border-2 border-slate-200">
-                    <span className="text-sm font-medium text-slate-700">{item.domain}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-slate-600">{item.correct}/{item.total}</span>
-                      <span className={`text-sm font-bold ${item.percentage >= 70 ? 'text-green-600' : 'text-red-600'}`}>
-                        {item.percentage}%
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <Button onClick={handleRetake} variant="outline" className="w-full border-2">
-          <RotateCcw className="w-4 h-4 mr-2" />
-          Retake {quizType === 'mock' ? 'Exam' : 'Quiz'}
-        </Button>
-
-        <Card className="border-2 border-slate-200">
-          <CardHeader>
-            <CardTitle className="text-xl font-bold text-slate-900">Review Answers</CardTitle>
-            <p className="text-sm text-slate-600">Click on any question to see details</p>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {questions.map((question, index) => {
-                const isCorrect = selectedAnswers[index] === question.correctAnswer;
-                const isExpanded = expandedQuestions[index];
-                
-                return (
-                  <div key={index}>
-                    <button
-                      onClick={() => setExpandedQuestions({
-                        ...expandedQuestions,
-                        [index]: !isExpanded
-                      })}
-                      className={`w-full flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
-                        isCorrect 
-                          ? 'bg-green-50 border-green-300 hover:bg-green-100' 
-                          : 'bg-red-50 border-red-300 hover:bg-red-100'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        {isCorrect ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-600" />
-                        ) : (
-                          <XCircle className="w-5 h-5 text-red-600" />
-                        )}
-                        <span className="font-medium text-slate-900">Question {index + 1}</span>
-                        <span className={`text-sm font-semibold ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
-                          {isCorrect ? 'Correct' : 'Incorrect'}
-                        </span>
-                      </div>
-                      {isExpanded ? (
-                        <ChevronUp className="w-5 h-5 text-slate-600" />
-                      ) : (
-                        <ChevronDown className="w-5 h-5 text-slate-600" />
-                      )}
-                    </button>
-                    
-                    {isExpanded && (
-                      <div className="mt-2">
-                        <QuizQuestion
-                          question={question}
-                          questionNumber={index + 1}
-                          totalQuestions={questions.length}
-                          selectedAnswer={selectedAnswers[index]}
-                          onAnswerSelect={() => {}}
-                          showResults={true}
-                          correctAnswer={question.correctAnswer}
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <QuizResults
+        questions={questions}
+        selectedAnswers={selectedAnswers}
+        quizType={quizType || 'domain'}
+        domainId={domainId}
+        domainTitle={domainTitle}
+        score={calculateScore()}
+        completionTime={quizCompletionTime}
+        formatTime={formatTime}
+        isQuestionFlagged={isQuestionFlagged}
+        onToggleFlag={handleToggleFlag}
+        onRetake={handleRetake}
+        onExit={handleExit}
+      />
     );
   }
 
@@ -352,12 +265,34 @@ export default function TakeQuiz() {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Exit {quizType === 'mock' ? 'Exam' : 'Quiz'}
         </Button>
-        {domainTitle && (
-          <div className="text-right">
-            <h2 className="text-lg font-bold text-slate-900">{domainTitle}</h2>
-            {difficulty && <p className="text-sm text-slate-600">{difficulty} Level</p>}
-          </div>
-        )}
+
+        <div className="flex items-center gap-4">
+          {domainTitle && (
+            <div className="text-right">
+              <h2 className="text-lg font-bold text-slate-900">{domainTitle}</h2>
+              {difficulty && <p className="text-sm text-slate-600">{difficulty} Level</p>}
+            </div>
+          )}
+
+          {/* Flag for later review. Collected by the custom quiz builder's
+              "Flagged for review" pool. */}
+          <Button
+            variant="outline"
+            onClick={() => handleToggleFlag(currentQuestion)}
+            aria-pressed={isQuestionFlagged(currentQuestion)}
+            title={isQuestionFlagged(currentQuestion) ? 'Remove flag' : 'Flag for review'}
+            className={`border-2 ${
+              isQuestionFlagged(currentQuestion)
+                ? 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                : 'border-slate-300 text-slate-600'
+            }`}
+          >
+            <Flag
+              className={`w-4 h-4 mr-2 ${isQuestionFlagged(currentQuestion) ? 'fill-amber-500' : ''}`}
+            />
+            {isQuestionFlagged(currentQuestion) ? 'Flagged' : 'Flag'}
+          </Button>
+        </div>
       </div>
 
       {timerEnabled && (
@@ -416,31 +351,14 @@ export default function TakeQuiz() {
         )}
       </div>
 
-      <div className="flex gap-2 flex-wrap p-4 bg-white rounded-xl border-2 border-slate-200 justify-center shadow-sm">
-  {questions.map((_, index) => {
-    const isActive = index === currentQuestionIndex;
-    const isAnswered = selectedAnswers[index] !== undefined;
-
-    return (
-      <button
-        key={index}
-        onClick={() => setCurrentQuestionIndex(index)}
-        className={`
-          w-10 h-10 flex items-center justify-center rounded-lg font-medium border transition-all
-          ${
-            isActive
-              ? "bg-red-600 text-white border-red-600"
-              : isAnswered
-              ? "bg-green-50 text-green-700 border-green-300"
-              : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
-          }
-        `}
-      >
-        {index + 1}
-      </button>
-    );
-  })}
-</div>
+      <QuestionNavigator
+        questions={questions}
+        currentIndex={currentQuestionIndex}
+        selectedAnswers={selectedAnswers}
+        isQuestionFlagged={isQuestionFlagged}
+        onJump={setCurrentQuestionIndex}
+        showCorrectness={revealsAnswersImmediately}
+      />
 
 
       <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>

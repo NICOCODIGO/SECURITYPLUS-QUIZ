@@ -63,6 +63,11 @@ export default function QuizQuestion({
               const isThisIncorrect =
                 showResults && isThisSelected && !isThisCorrect;
 
+                // Before the answer is revealed — every question in a mock
+                // exam — a picked choice still needs to look picked, or the
+                // only cue is the small radio dot.
+                const isThisPending = !showResults && isThisSelected;
+
                 return (
                 <Label
                   key={index}
@@ -74,6 +79,8 @@ export default function QuizQuestion({
                     ? "bg-green-50 border-green-300"
                     : isThisIncorrect
                     ? "bg-red-50 border-red-300"
+                    : isThisPending
+                    ? "bg-slate-100 border-slate-500 ring-1 ring-slate-400"
                     : "border-slate-300 hover:bg-slate-50"
                   }
                   ${showResults ? "cursor-default" : "cursor-pointer"}

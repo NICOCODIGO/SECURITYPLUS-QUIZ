@@ -4,49 +4,37 @@ import Dashboard from '../components/quiz/Dashboard';
 import DomainQuiz from '../components/quiz/DomainQuiz';
 import MockExam from '../components/quiz/MockExam';
 import WeakestSubjectQuiz from '../components/quiz/WeakestSubjectQuiz';
+import QuestionOfTheDay from '../components/quiz/QuestionOfTheDay';
+import CustomQuizBuilder from '../components/quiz/CustomQuizBuilder';
 import { quizQuestions, getAllQuestions } from '../components/data/quizData';
+import { getDomainById } from '../components/data/securityDomains';
 
 export default function Lessons() {
   const urlParams = new URLSearchParams(window.location.search);
   const sectionParam = urlParams.get('section');
   const [selectedSection, setSelectedSection] = useState(sectionParam || 'dashboard');
 
-  const domains = [
-    {
-      id: 'domain1',
-      title: '1.0 General Security Concepts',
-      description: 'Understanding security controls, principles, and foundational concepts',
-      percentage: '12%'
-    },
-    {
-      id: 'domain2',
-      title: '2.0 Threats, Vulnerabilities, and Mitigations',
-      description: 'Identifying threat actors, attack vectors, and security measures',
-      percentage: '22%'
-    },
-    {
-      id: 'domain3',
-      title: '3.0 Security Architecture',
-      description: 'Designing secure network architectures and implementing controls',
-      percentage: '18%'
-    },
-    {
-      id: 'domain4',
-      title: '4.0 Security Operations',
-      description: 'Managing security tools, monitoring, and identity management',
-      percentage: '28%'
-    },
-    {
-      id: 'domain5',
-      title: '5.0 Security Program Management and Oversight',
-      description: 'Incident response, digital forensics, and security governance',
-      percentage: '20%'
-    }
-  ];
-
   const renderContent = () => {
     if (selectedSection === 'dashboard') {
       return <Dashboard onSectionChange={setSelectedSection} />;
+    }
+
+    if (selectedSection === 'daily') {
+      return (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-black text-comptia-charcoal">Question of the Day</h1>
+            <p className="text-slate-600 mt-2">
+              One question, the same for everyone, refreshed every midnight. Keep the streak alive.
+            </p>
+          </div>
+          <QuestionOfTheDay />
+        </div>
+      );
+    }
+
+    if (selectedSection === 'custom') {
+      return <CustomQuizBuilder />;
     }
 
     if (selectedSection === 'mock') {
@@ -57,20 +45,22 @@ export default function Lessons() {
       return <WeakestSubjectQuiz allQuestions={getAllQuestions()} />;
     }
 
-    const domainMap = {
-      domain1: { domain: domains[0], questions: quizQuestions.domain1 },
-      domain2: { domain: domains[1], questions: quizQuestions.domain2 },
-      domain3: { domain: domains[2], questions: quizQuestions.domain3 },
-      domain4: { domain: domains[3], questions: quizQuestions.domain4 },
-      domain5: { domain: domains[4], questions: quizQuestions.domain5 },
-    };
-
-    const selectedDomain = domainMap[selectedSection];
-    if (selectedDomain) {
-      return <DomainQuiz domain={selectedDomain.domain} questions={selectedDomain.questions} />;
+    const domain = getDomainById(selectedSection);
+    if (domain) {
+      return (
+        <DomainQuiz
+          domain={{
+            id: domain.id,
+            title: domain.numberedTitle,
+            description: domain.description,
+            percentage: domain.weight,
+          }}
+          questions={quizQuestions[domain.id]}
+        />
+      );
     }
 
-    return <Dashboard />;
+    return <Dashboard onSectionChange={setSelectedSection} />;
   };
 
   return (

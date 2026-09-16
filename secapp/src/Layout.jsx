@@ -16,50 +16,25 @@ export default function Layout({ children, currentPageName }) {
   const isQuizPage = currentPageName === "TakeQuiz";
 
   return (
-    <div className="relative min-h-screen bg-white">
+    <div className="relative min-h-screen bg-comptia-canvas">
       <ScrollToTop />
 
-      {/* ✨ ENHANCED RED GRADIENT ACCENTS - Zig-Zag Pattern */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
-        {/* 1. Top Right */}
-        <div 
-          className="absolute top-10 -right-32 w-[500px] h-[500px] bg-red-500 opacity-[0.14] rounded-full"
-          style={{ filter: 'blur(100px)' }}
-        />
-        
-        {/* 2. Upper-Middle Left */}
-        <div 
-          className="absolute top-[20%] -left-40 w-[450px] h-[450px] bg-red-600 opacity-[0.12] rounded-full"
-          style={{ filter: 'blur(90px)' }}
-        />
-        
-        {/* 3. Middle Right */}
-        <div 
-          className="absolute top-[40%] -right-40 w-[520px] h-[520px] bg-red-400 opacity-[0.10] rounded-full"
-          style={{ filter: 'blur(95px)' }}
-        />
-        
-        {/* 4. Lower-Middle Left */}
-        <div 
-          className="absolute top-[60%] -left-32 w-[480px] h-[480px] bg-red-500 opacity-[0.13] rounded-full"
-          style={{ filter: 'blur(100px)' }}
-        />
-        
-        {/* 5. Bottom Right */}
-        <div 
-          className="absolute top-[80%] -right-36 w-[550px] h-[550px] bg-red-600 opacity-[0.15] rounded-full"
-          style={{ filter: 'blur(110px)' }}
-        />
-        
-        {/* 6. Very Bottom Left (subtle) */}
-        <div 
-          className="absolute bottom-10 -left-20 w-[400px] h-[400px] bg-red-500 opacity-[0.08] rounded-full"
-          style={{ filter: 'blur(85px)' }}
-        />
-      </div>
+      {/* Neutral technical grid. Replaces the old red blur field — CompTIA
+          uses red as an accent only, never as an ambient page wash. */}
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          zIndex: 0,
+          backgroundImage:
+            'linear-gradient(#1D252D 1px, transparent 1px), linear-gradient(90deg, #1D252D 1px, transparent 1px)',
+          backgroundSize: '64px 64px',
+          opacity: 0.03,
+        }}
+      />
 
-      {/* Content wrapper */}
-      <div className="relative" style={{ zIndex: 1 }}>
+      {/* Content wrapper. Flex column so <main> absorbs the slack and the
+          footer is pinned to the bottom of the viewport on short pages. */}
+      <div className="relative flex flex-col min-h-screen" style={{ zIndex: 1 }}>
 
         <style>{`
           .text-red-600, .text-red-700 { color: #C8102E !important; }
@@ -78,7 +53,7 @@ export default function Layout({ children, currentPageName }) {
               <div className="flex justify-between items-center h-16">
 
                 <Link to="/" className="flex items-center gap-3 group">
-                  <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all border-4 border-slate-300">
+                  <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all border-4 border-comptia-charcoal/15">
                     <Shield className="w-6 h-6 text-white" />
                   </div>
                   <div>
@@ -163,14 +138,17 @@ export default function Layout({ children, currentPageName }) {
           </nav>
         )}
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</main>
 
         {!isQuizPage && (
-          <footer className="bg-slate-50/50 backdrop-blur-sm border-t border-slate-200 mt-20">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-              <p className="text-center text-sm text-slate-500">
-                © 2024 EduPrep. Preparing you for CompTIA Security+ certification.
-              </p>
+          <footer className="bg-comptia-charcoal mt-20">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <span className="h-1 w-10 bg-red-600 rounded-full" />
+                <p className="text-center text-sm text-slate-400">
+                  © {new Date().getFullYear()} EduPrep. Preparing you for CompTIA Security+ certification.
+                </p>
+              </div>
             </div>
           </footer>
         )}

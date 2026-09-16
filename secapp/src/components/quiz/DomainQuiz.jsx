@@ -1,131 +1,171 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useMemo, useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Target, ArrowRight, Clock } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
-import { createPageUrl } from "@/lib/utils";
+import { ArrowRight, Clock, Layers, BarChart3 } from 'lucide-react';
+import { createPageUrl } from '@/lib/utils';
+import { getDomainById } from '../data/securityDomains';
+import { shuffle } from '../data/questionPools';
+import OptionChips from './OptionChips';
+
+/**
+ * Setup screen for a single domain quiz.
+ *
+ * Takes its colour, icon and ring from the domain's own metadata so it reads
+ * as a continuation of the domain cards on Home and About, rather than a
+ * generic red form.
+ *
+ * Question count is a set of presets rather than a slider — the old range
+ * input let you pick 37 questions, which is a choice nobody needs to make,
+ * and it could exceed the number of questions actually available.
+ */
+
+const COUNT_PRESETS = [10, 20, 30, 50];
+const DIFFICULTIES = ['All', 'Beginner', 'Intermediate', 'Advanced'];
 
 export default function DomainQuiz({ domain, questions }) {
-  const navigate = useNavigate();
-  const [difficulty, setDifficulty] = useState('Beginner');
+  const [difficulty, setDifficulty] = useState('All');
   const [questionCount, setQuestionCount] = useState(10);
   const [timerEnabled, setTimerEnabled] = useState(false);
 
+  // `domain` arrives from Lessons as a trimmed object; pull the full record
+  // for the icon and colour tokens.
+  const meta = getDomainById(domain.id);
+
+  const available = useMemo(
+    () =>
+      difficulty === 'All'
+        ? questions
+        : questions.filter((q) => q.difficulty === difficulty),
+    [questions, difficulty]
+  );
+
+  // Never offer more questions than exist at the chosen difficulty.
+  const countOptions = useMemo(() => {
+    const presets = COUNT_PRESETS.filter((n) => n < available.length);
+    return [...presets, available.length];
+  }, [available.length]);
+
+  const effectiveCount = Math.min(questionCount, available.length);
+
+  const difficultyCounts = useMemo(() => {
+    const counts = { All: questions.length };
+    DIFFICULTIES.slice(1).forEach((level) => {
+      counts[level] = questions.filter((q) => q.difficulty === level).length;
+    });
+    return counts;
+  }, [questions]);
+
   const handleStartQuiz = () => {
-    // First try to get questions from selected difficulty
-    let selected = questions.filter(q => q.difficulty === difficulty);
-    
-    // If not enough questions at this difficulty, add from other difficulties
-    if (selected.length < questionCount) {
-      const remaining = questions.filter(q => q.difficulty !== difficulty);
-      selected = [...selected, ...remaining].slice(0, questionCount);
-    } else {
-      selected = selected.slice(0, questionCount);
-    }
-    
-    // Store questions in sessionStorage to avoid URL length limits
+    const selected = shuffle(available).slice(0, effectiveCount);
+
     const quizId = `quiz_${Date.now()}`;
     sessionStorage.setItem(quizId, JSON.stringify(selected));
-    
+
     const params = new URLSearchParams({
       type: 'domain',
       domain: domain.title,
       domainId: domain.id,
       percentage: domain.percentage,
-      difficulty: difficulty,
+      difficulty,
       timer: timerEnabled.toString(),
-      quizId: quizId
+      quizId,
     });
     window.location.href = createPageUrl('TakeQuiz') + '?' + params.toString();
   };
 
   return (
-    <div className="space-y-6">
-      <Card className="border-2 border-slate-200 shadow-lg">
-        <CardHeader className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center">
-              <Target className="w-6 h-6 text-white" />
+    <Card className="border-2 border-slate-200 shadow-lg overflow-hidden">
+      {/* Domain header — icon in its own colour ring, on charcoal. */}
+      <div className="bg-comptia-charcoal px-6 py-6">
+        <div className="flex items-center gap-4">
+          {meta && (
+            <div className={`w-16 h-16 flex-shrink-0 rounded-full bg-white border-4 ${meta.ringColor} shadow-lg flex items-center justify-center`}>
+              <img src={meta.icon} alt="" className="w-9 h-9" />
             </div>
-            <div>
-              <CardTitle className="text-2xl font-bold text-slate-900">{domain.title}</CardTitle>
-              <p className="text-slate-600 mt-1">{domain.description}</p>
-            </div>
+          )}
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+              Domain {meta ? meta.number : ''} · {domain.percentage} of exam
+            </p>
+            <h2 className="text-2xl font-black text-white leading-tight mt-0.5">
+              {meta ? meta.title : domain.title}
+            </h2>
+            <p className="text-sm text-slate-400 mt-1">{domain.description}</p>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700 mb-3">Select Difficulty</h3>
+        </div>
+      </div>
 
-            <Tabs value={difficulty} onValueChange={setDifficulty}>
-              <TabsList className="w-full bg-slate-100 rounded-xl p-1 flex">
-                {['Beginner', 'Intermediate', 'Advanced'].map((level) => (
-                  <TabsTrigger
-                    key={level}
-                    value={level}
-                    className="
-                      flex-1 rounded-lg py-2 text-sm
-                      text-slate-500
-                      data-[state=active]:bg-red-600
-                      data-[state=active]:text-white
-                    "
-                  >
-                    {level}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          </div>
+      <CardContent className="p-6 space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Stat icon={Layers} label="In this domain" value={`${questions.length} questions`} />
+          <Stat icon={BarChart3} label="Exam weight" value={domain.percentage} />
+          <Stat
+            icon={Clock}
+            label="Estimated time"
+            value={`~${Math.max(1, Math.round(effectiveCount * 0.75))} min`}
+          />
+        </div>
 
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700 mb-3">Number of Questions</h3>
-            <input
-              type="range"
-              min="10"
-              max="90"
-              value={questionCount}
-              onChange={(e) => setQuestionCount(parseInt(e.target.value))}
-              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-red-600"
-            />
-            <div className="flex justify-between items-center mt-2">
-              <span className="text-xs text-slate-500">10</span>
-              <span className="text-lg font-bold text-red-600">{questionCount}</span>
-              <span className="text-xs text-slate-500">90</span>
-            </div>
-          </div>
+        <OptionChips
+          label="Difficulty"
+          options={DIFFICULTIES.map((level) => ({
+            value: level,
+            label: level,
+            hint: `${difficultyCounts[level]}`,
+            disabled: difficultyCounts[level] === 0,
+          }))}
+          value={difficulty}
+          onChange={setDifficulty}
+        />
 
-          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border-2 border-slate-200">
-            <div className="flex items-center gap-3">
-              <Clock className="w-5 h-5 text-slate-700" />
-              <div>
-                <p className="text-sm font-semibold text-slate-700">Time Limit</p>
-                <p className="text-xs text-slate-600">
-                  {timerEnabled ? `${questionCount} minutes (1 min per question)` : 'No time limit'}
-                </p>
-              </div>
-            </div>
-            <Switch checked={timerEnabled} onCheckedChange={setTimerEnabled} />
-          </div>
+        <OptionChips
+          label="Number of questions"
+          options={countOptions.map((n) => ({
+            value: n,
+            label: n === available.length ? `All ${n}` : `${n}`,
+          }))}
+          value={effectiveCount}
+          onChange={setQuestionCount}
+        />
 
-          <div className="max-w-xs mx-auto pt-4">
-            <div className="text-center p-4 bg-slate-50 rounded-lg border-2 border-slate-200">
-              <p className="text-2xl font-bold text-slate-900">{domain.percentage}</p>
-              <p className="text-sm text-slate-600">of Exam</p>
-            </div>
-          </div>
+        <label className="flex items-center justify-between gap-4 p-4 bg-slate-50 rounded-xl border-2 border-slate-200 cursor-pointer">
+          <span className="flex items-center gap-3">
+            <Clock className="w-5 h-5 text-slate-600" />
+            <span>
+              <span className="block text-sm font-bold text-comptia-charcoal">Time limit</span>
+              <span className="block text-xs text-slate-600">
+                {timerEnabled
+                  ? `${effectiveCount} minutes — 1 minute per question`
+                  : 'Take as long as you need'}
+              </span>
+            </span>
+          </span>
+          <Switch checked={timerEnabled} onCheckedChange={setTimerEnabled} />
+        </label>
 
-          <Button 
-            onClick={handleStartQuiz} 
-            className="w-full bg-red-600 hover:bg-red-700 h-12 font-semibold"
-            disabled={questions.length === 0}
-          >
-            Start Quiz
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
-        </CardContent>
-      </Card>
+        <Button
+          onClick={handleStartQuiz}
+          className="w-full bg-red-600 hover:bg-red-700 text-white h-14 text-base font-bold rounded-xl"
+          disabled={available.length === 0}
+        >
+          Start {effectiveCount}-question quiz
+          <ArrowRight className="w-5 h-5 ml-2" />
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function Stat({ icon, label, value }) {
+  const Icon = icon;
+  return (
+    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+      <Icon className="w-4 h-4 text-slate-500 flex-shrink-0" />
+      <div className="min-w-0">
+        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">{label}</p>
+        <p className="text-sm font-bold text-comptia-charcoal truncate">{value}</p>
+      </div>
     </div>
   );
 }

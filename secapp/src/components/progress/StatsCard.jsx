@@ -1,7 +1,8 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 
-export default function StatsCard({ icon: Icon, title, value, subtitle, color = 'blue' }) {
+export default function StatsCard({ icon, title, value, subtitle, color = 'blue' }) {
+  const Icon = icon;
   const colorClasses = {
     blue: 'bg-red-600 text-white',
     green: 'bg-green-600 text-white',

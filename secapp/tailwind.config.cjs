@@ -12,6 +12,17 @@ module.exports = {
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		colors: {
+  			// CompTIA brand palette. Red is the accent, charcoal is the
+  			// second brand colour used for the dark full-bleed bands, and
+  			// canvas is the neutral page ground. Keep red for accents only —
+  			// it is deliberately never used as an ambient background.
+  			comptia: {
+  				red: '#C8102E',
+  				'red-dark': '#B01D2A',
+  				charcoal: '#2F3946',
+  				'charcoal-light': '#414D5E',
+  				canvas: '#F7F8FA'
+  			},
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {

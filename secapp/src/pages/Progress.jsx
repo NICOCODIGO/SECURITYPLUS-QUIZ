@@ -1,290 +1,239 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import {
-  CheckCircle2,
   Target,
   Clock,
   TrendingUp,
   Award,
   ThumbsUp,
   ThumbsDown,
+  ListChecks,
+  FlaskConical,
+  ArrowRight,
 } from 'lucide-react';
-import { Progress as ProgressBar } from '@/components/ui/progress';
 import StatsCard from '../components/progress/StatsCard';
-import { format } from 'date-fns';
-import { lessons } from '../components/data/lessonsData';
+import DomainPerformancePanel from '../components/progress/DomainPerformancePanel';
+import ScoreTrendChart from '../components/progress/ScoreTrendChart';
+import MostMissedPanel from '../components/progress/MostMissedPanel';
+import RecentActivityPanel from '../components/progress/RecentActivityPanel';
 import {
-  getProgress,
-  getCompletedLessonsCount,
-  getAverageQuizScore,
-  getTotalTimeSpent,
-} from '../components/data/progressData';
+  getQuizHistory,
+  getQuizStats,
+  getDomainPerformance,
+  getScoreTrend,
+  getMostMissed,
+  getRecentAttempts,
+  formatDuration,
+} from '../components/data/quizHistoryData';
+import { demoQuizHistory } from '@/lib/demoProgressData';
 
 /**
  * Progress Page
  * --------------------------------------------------
- * This page shows detailed learning analytics.
+ * Learning analytics derived from `quiz_history`, the key TakeQuiz writes
+ * when a quiz is submitted.
  *
- * IMPORTANT DESIGN DECISION:
- * - Guests can VIEW the dashboard (blurred)
- * - Only authenticated users can INTERACT with it
+ * The "Sample data" switch swaps the history array for a fixture and feeds it
+ * through the identical selectors, so the populated layout can be reviewed
+ * before taking a single quiz. It never writes to localStorage — turning it
+ * off returns you to your real results untouched.
  *
- * Authentication is simulated using localStorage.
- * This will later be replaced by real backend auth
- * WITHOUT changing the UI logic.
+ * When real auth arrives, this is where per-user data gets fetched instead of
+ * read from localStorage.
  */
-
 export default function Progress() {
-  /**
-   * TEMP AUTH CHECK (frontend-only)
-   * --------------------------------
-   * If auth_user exists → user is "signed in"
-   * Later this becomes a real auth state.
-   */
-  const isAuthenticated = Boolean(localStorage.getItem('auth_user'));
+  const [showSample, setShowSample] = useState(false);
 
-  /**
-   * PROGRESS DATA (localStorage-backed for now)
-   * -------------------------------------------
-   * This logic stays the same when backend is added.
-   */
-  const progress = getProgress();
-  const completedLessons = getCompletedLessonsCount();
-  const totalLessons = lessons.length;
-  const completionRate =
-    totalLessons > 0
-      ? Math.round((completedLessons / totalLessons) * 100)
-      : 0;
-  const averageScore = getAverageQuizScore();
-  const totalTimeSpent = getTotalTimeSpent();
+  const realHistory = useMemo(() => getQuizHistory(), []);
+  const history = showSample ? demoQuizHistory : realHistory;
 
-  const completedProgress = progress.filter((p) => p.completed);
+  const stats = useMemo(() => getQuizStats(history), [history]);
+  const performance = useMemo(() => getDomainPerformance(history), [history]);
+  const trend = useMemo(() => getScoreTrend(history), [history]);
+  const missed = useMemo(() => getMostMissed(history, 5), [history]);
+  const attempts = useMemo(() => getRecentAttempts(history, 8), [history]);
 
-  const getLessonById = (lessonId) => {
-    return lessons.find((l) => l.id === lessonId);
-  };
-
-  /**
-   * DOMAIN PERFORMANCE CALCULATION
-   * -------------------------------
-   * Aggregates quiz scores by domain
-   */
-  const getDomainPerformance = () => {
-    const quizScores = JSON.parse(
-      localStorage.getItem('quizScores') || '[]'
-    );
-
-    if (quizScores.length === 0) return null;
-
-    const domainStats = {};
-
-    quizScores.forEach((quiz) => {
-      if (quiz.domain) {
-        if (!domainStats[quiz.domain]) {
-          domainStats[quiz.domain] = {
-            total: 0,
-            count: 0,
-          };
-        }
-        domainStats[quiz.domain].total += quiz.score;
-        domainStats[quiz.domain].count += 1;
-      }
-    });
-
-    const domainAverages = Object.keys(domainStats).map((domain) => ({
-      domain,
-      average: Math.round(
-        domainStats[domain].total / domainStats[domain].count
-      ),
-      quizzesTaken: domainStats[domain].count,
-    }));
-
-    if (domainAverages.length === 0) return null;
-
-    domainAverages.sort((a, b) => b.average - a.average);
-
-    return {
-      strongest: domainAverages[0],
-      weakest: domainAverages[domainAverages.length - 1],
-      all: domainAverages,
-    };
-  };
-
-  const domainPerformance = getDomainPerformance();
+  const hasHistory = history.length > 0;
 
   return (
     <div className="relative">
-      {/* -------------------------------------------------
-          DASHBOARD CONTENT
-          - Blurred + disabled for guests
-          - Fully interactive for authenticated users
-      -------------------------------------------------- */}
-      <div
-        className={
-          !isAuthenticated
-            ? 'blur-sm pointer-events-none select-none'
-            : ''
-        }
-      >
-        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 space-y-8">
-          {/* Header */}
-          <div className="text-center space-y-4">
-            <div className="inline-flex items-center gap-2 bg-red-50 px-5 py-2.5 rounded-full border-2 border-red-200">
-              <TrendingUp className="w-5 h-5 text-red-600" />
-              <span className="text-sm font-bold text-red-700 uppercase tracking-wide">
-                Your Learning Journey
-              </span>
-            </div>
-            <h1 className="text-5xl font-black text-slate-900 uppercase tracking-tight">
-              Progress Dashboard
-            </h1>
-            <p className="text-lg text-slate-700 max-w-2xl mx-auto font-medium">
-              Track your learning progress and quiz performance
-            </p>
-          </div>
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 space-y-8">
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatsCard
-              icon={CheckCircle2}
-              title="Lessons Completed"
-              value={`${completedLessons}/${totalLessons}`}
-              subtitle={`${completionRate}% complete`}
-              color="green"
-            />
-            <StatsCard
-              icon={Target}
-              title="Average Quiz Score"
-              value={`${averageScore}%`}
-              subtitle={
-                averageScore > 0
-                  ? 'Keep up the good work!'
-                  : 'No quizzes taken yet'
-              }
-              color="blue"
-            />
-            <StatsCard
-              icon={Clock}
-              title="Time Spent"
-              value={`${totalTimeSpent}h`}
-              subtitle="Total learning time"
-              color="amber"
-            />
-            <StatsCard
-              icon={Award}
-              title="Completion Rate"
-              value={`${completionRate}%`}
-              subtitle="Keep up the great work!"
-              color="purple"
-            />
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center gap-2 bg-red-50 px-5 py-2.5 rounded-full border-2 border-red-200">
+            <TrendingUp className="w-5 h-5 text-red-600" />
+            <span className="text-sm font-bold text-red-700 uppercase tracking-wide">
+              Your Learning Journey
+            </span>
           </div>
+          <h1 className="text-5xl font-black text-comptia-charcoal uppercase tracking-tight">
+            Progress Dashboard
+          </h1>
+          <p className="text-lg text-slate-700 max-w-2xl mx-auto font-medium">
+            Track your learning progress and quiz performance
+          </p>
+        </div>
 
-          {/* Overall Progress */}
-          <Card className="border-slate-200 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-xl font-bold text-slate-900">
-                Overall Progress
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">
-                    Course Completion
-                  </span>
-                  <span className="font-semibold text-slate-900">
-                    {completionRate}%
-                  </span>
-                </div>
-                <ProgressBar value={completionRate} className="h-3" />
+        {/* Sample-data switch */}
+        <Card className={`border-2 shadow-sm ${showSample ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+          <CardContent className="p-4 flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${showSample ? 'bg-amber-500' : 'bg-slate-200'}`}>
+                <FlaskConical className={`w-5 h-5 ${showSample ? 'text-white' : 'text-slate-500'}`} />
               </div>
-              <p className="text-sm text-slate-600">
-                {completedLessons === totalLessons
-                  ? "🎉 Congratulations! You've completed all lessons!"
-                  : `${totalLessons - completedLessons} lessons remaining`}
+              <div>
+                <p className="text-sm font-bold text-comptia-charcoal">
+                  {showSample ? 'Showing sample data — not your results' : 'Preview with sample data'}
+                </p>
+                <p className="text-xs text-slate-600">
+                  {showSample
+                    ? 'Nothing here is saved. Switch off to see your own progress.'
+                    : 'See what this dashboard looks like once you have taken some quizzes.'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-bold text-slate-700">Sample data</span>
+              <Switch
+                checked={showSample}
+                onCheckedChange={setShowSample}
+                aria-label="Preview the dashboard with sample data"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatsCard
+            icon={ListChecks}
+            title="Quizzes Taken"
+            value={`${stats.attempts}`}
+            subtitle={hasHistory ? `${stats.questionsAnswered} questions answered` : 'No quizzes yet'}
+            color="green"
+          />
+          <StatsCard
+            icon={Target}
+            title="Average Score"
+            value={`${stats.averageScore}%`}
+            subtitle={
+              hasHistory
+                ? `${stats.correctAnswers} of ${stats.questionsAnswered} correct`
+                : 'Take a quiz to get started'
+            }
+            color="blue"
+          />
+          <StatsCard
+            icon={Award}
+            title="Best Score"
+            value={`${stats.bestScore}%`}
+            subtitle={stats.bestScoreLabel || 'No quizzes yet'}
+            color="purple"
+          />
+          <StatsCard
+            icon={Clock}
+            title="Time Spent"
+            value={formatDuration(stats.studySeconds)}
+            subtitle="Total time in quizzes"
+            color="amber"
+          />
+        </div>
+
+        {/* Empty state — one clear call to action beats five empty panels */}
+        {!hasHistory && (
+          <Card className="border-2 border-slate-200 shadow-lg">
+            <CardContent className="p-12 text-center space-y-4">
+              <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mx-auto shadow-lg">
+                <Target className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-black text-comptia-charcoal">
+                No quiz results yet
+              </h2>
+              <p className="text-slate-600 max-w-lg mx-auto">
+                Take a domain quiz or a mock exam and this dashboard fills in — accuracy
+                per domain, your score trend, and the questions you keep getting wrong.
+                Flip the switch above to see what that looks like first.
               </p>
+              <Link to="/lessons">
+                <Button className="bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-6 rounded-lg inline-flex items-center gap-2">
+                  Take your first quiz
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+              </Link>
             </CardContent>
           </Card>
+        )}
 
-          {/* Domain Performance */}
-          {domainPerformance && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="border-2 border-green-200 bg-green-50 shadow-lg">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
-                      <ThumbsUp className="w-6 h-6 text-white" />
-                    </div>
-                    <CardTitle>Strongest Domain</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <h3 className="font-bold text-lg">
-                    {domainPerformance.strongest.domain}
-                  </h3>
-                  <p className="text-4xl font-black text-green-600">
-                    {domainPerformance.strongest.average}%
-                  </p>
-                </CardContent>
-              </Card>
+        {hasHistory && (
+          <>
+            {/* Strongest / Weakest */}
+            {performance.strongest && performance.weakest && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <HighlightCard
+                  tone="good"
+                  icon={ThumbsUp}
+                  title="Strongest Domain"
+                  row={performance.strongest}
+                />
+                <HighlightCard
+                  tone="bad"
+                  icon={ThumbsDown}
+                  title="Weakest Domain"
+                  row={performance.weakest}
+                />
+              </div>
+            )}
 
-              <Card className="border-2 border-red-200 bg-red-50 shadow-lg">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center">
-                      <ThumbsDown className="w-6 h-6 text-white" />
-                    </div>
-                    <CardTitle>Weakest Domain</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <h3 className="font-bold text-lg">
-                    {domainPerformance.weakest.domain}
-                  </h3>
-                  <p className="text-4xl font-black text-red-600">
-                    {domainPerformance.weakest.average}%
-                  </p>
-                </CardContent>
-              </Card>
+            <DomainPerformancePanel performance={performance} />
+
+            <ScoreTrendChart trend={trend} />
+
+            <MostMissedPanel missed={missed} hasHistory={hasHistory} />
+
+            <RecentActivityPanel attempts={attempts} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HighlightCard({ tone, icon, title, row }) {
+  const Icon = icon;
+  const good = tone === 'good';
+
+  return (
+    <Card className={`border-2 shadow-lg ${good ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${good ? 'bg-emerald-700' : 'bg-red-600'}`}>
+            <Icon className="w-6 h-6 text-white" />
+          </div>
+          <CardTitle className="text-comptia-charcoal">{title}</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center gap-4">
+          {row.domain && (
+            <div className={`w-14 h-14 flex-shrink-0 rounded-full bg-white border-4 ${row.domain.ringColor} flex items-center justify-center`}>
+              <img src={row.domain.icon} alt="" className="w-8 h-8" />
             </div>
           )}
-        </div>
-      </div>
-
-      {/* -------------------------------------------------
-          GUEST OVERLAY (CALL TO ACTION)
-          - Only shown when NOT authenticated
-      -------------------------------------------------- */}
-      {!isAuthenticated && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl p-8 max-w-md text-center shadow-xl">
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">
-              Track Your Progress
-            </h2>
-            <p className="text-sm text-slate-600 mb-6">
-              Create an account to save quiz results, monitor improvement,
-              and view detailed learning analytics.
+          <div className="min-w-0">
+            <h3 className="font-bold text-base text-comptia-charcoal">{row.title}</h3>
+            <p className={`text-4xl font-black ${good ? 'text-emerald-700' : 'text-red-600'}`}>
+              {row.accuracy}%
             </p>
-
-            {/* TEMP AUTH SIMULATION */}
-            <button
-              onClick={() =>
-                localStorage.setItem(
-                  'auth_user',
-                  JSON.stringify({ id: 'demo-user' })
-                )
-              }
-              className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg"
-            >
-              Create Free Account
-            </button>
-
-            <p className="text-xs text-slate-500 mt-3">
-              Already have an account? Sign in
+            <p className="text-xs text-slate-600 mt-1">
+              {row.correct} of {row.total} correct
             </p>
           </div>
         </div>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }
