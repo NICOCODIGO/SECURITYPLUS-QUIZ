@@ -35,7 +35,7 @@ export default function WeakestSubjectQuiz({ allQuestions }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">Weakest Subject Quiz</h1>
+        <h2 className="text-3xl font-bold text-slate-900">Weakest Subject Quiz</h2>
         <p className="text-slate-600 mt-2">Focus on improving your lowest performing subject</p>
       </div>
 

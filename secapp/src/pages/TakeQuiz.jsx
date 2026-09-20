@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Clock, ArrowLeft, Flag } from 'lucide-react';
 import QuizQuestion from '../components/quiz/QuizQuestion';
@@ -258,19 +257,46 @@ export default function TakeQuiz() {
     );
   }
 
+  const quizTitle = domainTitle || (quizType === 'mock' ? 'Mock Exam' : null);
+  const currentFlagged = isQuestionFlagged(currentQuestion);
+  const timeIsLow = timeRemaining < (quizType === 'mock' ? 600 : 120);
+
+  // Everything fits on one laptop screen: a single top bar (exit, title,
+  // timer, flag), the question with its own Previous/Next, and — from lg up —
+  // the navigator in a sidebar instead of stacked underneath. Below lg the
+  // same grid collapses back to one column.
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={handleExit} className="border-2">
-          <ArrowLeft className="w-4 h-4 mr-2" />
+    <div className="max-w-6xl mx-auto space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button variant="outline" size="sm" onClick={handleExit} className="border-2">
+          <ArrowLeft className="w-4 h-4 mr-1.5" />
           Exit {quizType === 'mock' ? 'Exam' : 'Quiz'}
         </Button>
 
-        <div className="flex items-center gap-4">
-          {domainTitle && (
-            <div className="text-right">
-              <h2 className="text-lg font-bold text-slate-900">{domainTitle}</h2>
-              {difficulty && <p className="text-sm text-slate-600">{difficulty} Level</p>}
+        {/* On phones the title drops to its own line below the buttons, or
+            the timer and flag squeeze it to nothing. */}
+        <div className="order-last basis-full min-w-0 sm:order-none sm:basis-auto sm:flex-1">
+          {quizTitle && (
+            <h2 className="text-base font-bold text-slate-900 leading-tight truncate">
+              {quizTitle}
+              {difficulty && difficulty !== 'All' && (
+                <span className="ml-2 text-sm font-medium text-slate-500">{difficulty} level</span>
+              )}
+            </h2>
+          )}
+        </div>
+
+        <div className="ml-auto flex items-center gap-3">
+          {timerEnabled && (
+            <div
+              role="timer"
+              aria-label="Time remaining"
+              className={`inline-flex items-center gap-2 rounded-lg border-2 px-3 py-1 ${
+                timeIsLow ? 'border-red-200 bg-red-50 text-red-600' : 'border-slate-200 bg-white text-slate-900'
+              }`}
+            >
+              <Clock className={`w-4 h-4 ${timeIsLow ? '' : 'text-red-600'}`} />
+              <span className="font-mono text-base font-bold tabular-nums">{formatTime(timeRemaining)}</span>
             </div>
           )}
 
@@ -278,87 +304,69 @@ export default function TakeQuiz() {
               "Flagged for review" pool. */}
           <Button
             variant="outline"
+            size="sm"
             onClick={() => handleToggleFlag(currentQuestion)}
-            aria-pressed={isQuestionFlagged(currentQuestion)}
-            title={isQuestionFlagged(currentQuestion) ? 'Remove flag' : 'Flag for review'}
+            aria-pressed={currentFlagged}
+            title={currentFlagged ? 'Remove flag' : 'Flag for review'}
             className={`border-2 ${
-              isQuestionFlagged(currentQuestion)
+              currentFlagged
                 ? 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100'
                 : 'border-slate-300 text-slate-600'
             }`}
           >
-            <Flag
-              className={`w-4 h-4 mr-2 ${isQuestionFlagged(currentQuestion) ? 'fill-amber-500' : ''}`}
-            />
-            {isQuestionFlagged(currentQuestion) ? 'Flagged' : 'Flag'}
+            <Flag className={`w-4 h-4 mr-1.5 ${currentFlagged ? 'fill-amber-500' : ''}`} />
+            {currentFlagged ? 'Flagged' : 'Flag'}
           </Button>
         </div>
       </div>
 
-      {timerEnabled && (
-        <Card className="border-2 border-slate-200 bg-slate-50">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Clock className="w-5 h-5 text-red-600" />
-              <div>
-                <p className="text-sm text-slate-600">Time Remaining</p>
-                <p className={`text-lg font-bold ${timeRemaining < (quizType === 'mock' ? 600 : 120) ? 'text-red-600' : 'text-slate-900'}`}>
-                  {formatTime(timeRemaining)}
-                </p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-slate-600">Progress</p>
-              <p className="text-lg font-bold text-slate-900">
-                {Object.keys(selectedAnswers).length}/{questions.length}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+        <QuizQuestion
+          question={currentQuestion}
+          questionNumber={currentQuestionIndex + 1}
+          totalQuestions={questions.length}
+          selectedAnswer={selectedAnswers[currentQuestionIndex]}
+          onAnswerSelect={handleAnswerSelect}
+          showResults={showFeedback[currentQuestionIndex] || false}
+          correctAnswer={currentQuestion.correctAnswer}
+          footer={
+            <>
+              <Button
+                variant="outline"
+                onClick={handlePrevious}
+                disabled={currentQuestionIndex === 0}
+                className="border-2"
+              >
+                Previous
+              </Button>
+              {!isLastQuestion ? (
+                <Button onClick={handleNext} className="bg-slate-700 hover:bg-slate-800">
+                  Next
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSubmit}
+                  disabled={!allQuestionsAnswered}
+                  className="bg-red-600 hover:bg-red-700 font-semibold"
+                >
+                  Submit {quizType === 'mock' ? 'Exam' : 'Quiz'}
+                </Button>
+              )}
+            </>
+          }
+        />
 
-      <QuizQuestion
-        question={currentQuestion}
-        questionNumber={currentQuestionIndex + 1}
-        totalQuestions={questions.length}
-        selectedAnswer={selectedAnswers[currentQuestionIndex]}
-        onAnswerSelect={handleAnswerSelect}
-        showResults={showFeedback[currentQuestionIndex] || false}
-        correctAnswer={currentQuestion.correctAnswer}
-      />
-
-      <div className="flex justify-between">
-        <Button
-          variant="outline"
-          onClick={handlePrevious}
-          disabled={currentQuestionIndex === 0}
-          className="border-2"
-        >
-          Previous
-        </Button>
-        {!isLastQuestion ? (
-          <Button onClick={handleNext} className="bg-slate-700 hover:bg-slate-800">
-            Next
-          </Button>
-        ) : (
-          <Button
-            onClick={handleSubmit}
-            disabled={!allQuestionsAnswered}
-            className="bg-red-600 hover:bg-red-700 font-semibold"
-          >
-            Submit {quizType === 'mock' ? 'Exam' : 'Quiz'}
-          </Button>
-        )}
+        <div className="lg:sticky lg:top-4">
+          <QuestionNavigator
+            questions={questions}
+            currentIndex={currentQuestionIndex}
+            selectedAnswers={selectedAnswers}
+            isQuestionFlagged={isQuestionFlagged}
+            onJump={setCurrentQuestionIndex}
+            showCorrectness={revealsAnswersImmediately}
+          />
+        </div>
       </div>
-
-      <QuestionNavigator
-        questions={questions}
-        currentIndex={currentQuestionIndex}
-        selectedAnswers={selectedAnswers}
-        isQuestionFlagged={isQuestionFlagged}
-        onJump={setCurrentQuestionIndex}
-        showCorrectness={revealsAnswersImmediately}
-      />
 
 
       <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>

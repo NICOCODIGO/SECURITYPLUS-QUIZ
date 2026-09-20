@@ -10,10 +10,15 @@ import { ChevronDown, ChevronUp, Flag, LayoutGrid } from 'lucide-react';
  * are, how many are flagged — and the grid is one click away.
  *
  * Short quizzes open expanded, because at 10-20 questions the grid is small
- * enough to be worth showing outright.
+ * enough to be worth showing outright. From lg up TakeQuiz shows this as a
+ * sidebar beside the question, where it has room, so it opens for any length
+ * and the grid scrolls within the panel.
  */
 
 const EXPANDED_BY_DEFAULT_UP_TO = 20;
+
+const isSidebarLayout = () =>
+  typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
 
 export default function QuestionNavigator({
   questions,
@@ -24,8 +29,12 @@ export default function QuestionNavigator({
   // False during a mock exam, where nothing may hint at correctness until the
   // whole paper is submitted.
   showCorrectness = true,
+  // Home's practice preview shows this collapsed, as a progress bar.
+  defaultOpen = null,
 }) {
-  const [open, setOpen] = useState(questions.length <= EXPANDED_BY_DEFAULT_UP_TO);
+  const [open, setOpen] = useState(
+    () => defaultOpen ?? (questions.length <= EXPANDED_BY_DEFAULT_UP_TO || isSidebarLayout())
+  );
 
   const answered = Object.keys(selectedAnswers).length;
   const flaggedCount = questions.filter((q) => isQuestionFlagged(q)).length;
@@ -92,7 +101,7 @@ export default function QuestionNavigator({
               grid stretched 10 buttons across 20 tracks and left the row
               looking half empty. The padding also gives the current-question
               ring room, so the scroll container never clips it. */}
-          <div className="flex flex-wrap gap-2 p-4 max-h-48 overflow-y-auto">
+          <div className="flex flex-wrap gap-2 p-4 max-h-48 lg:max-h-[50vh] overflow-y-auto">
             {questions.map((question, index) => {
               const isActive = index === currentIndex;
               const isAnswered = selectedAnswers[index] !== undefined;

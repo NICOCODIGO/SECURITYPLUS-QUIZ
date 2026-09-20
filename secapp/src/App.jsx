@@ -9,6 +9,7 @@ import LessonDetail from './pages/LessonDetail';
 import Progress from './pages/Progress';
 import AdminContentManager from './pages/AdminContentManager';
 import TakeQuiz from './pages/TakeQuiz';
+import DailyQuestion from './pages/DailyQuestion';
 
 export default function App() {
   return (
@@ -73,6 +74,16 @@ export default function App() {
               <AdminContentManager />
             </Layout>
           } 
+        />
+
+        {/* Question of the Day, full screen like a quiz */}
+        <Route
+          path="/daily"
+          element={
+            <Layout currentPageName="DailyQuestion">
+              <DailyQuestion />
+            </Layout>
+          }
         />
 
         {/* Quiz route (existing /quiz path) */}

@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { X, ArrowRight, ListChecks, FileQuestion } from 'lucide-react';
 import { getObjectives, countTerms } from '../data/examObjectives';
@@ -8,45 +9,41 @@ import { getObjectives, countTerms } from '../data/examObjectives';
  *
  * Holds the official SY0-701 objectives for the domain — the full outline,
  * three levels deep. The list is long, so the card scrolls internally and
- * keeps its header and objective jump-bar pinned.
+ * keeps its header pinned.
+ *
+ * Rendered into <body> through a portal, not where it's used. Inline, it sat
+ * in a `space-y-8` list whose margin-top pushed the fixed overlay 32px down,
+ * leaving a strip of the nav showing above it, and it shared the page's
+ * stacking context with the sticky nav. From <body>, z-[60] clears the nav's
+ * z-50 outright.
  */
 export default function DomainDetailModal({ domain, onClose }) {
-  const bodyRef = useRef(null);
   const closeRef = useRef(null);
-  const [active, setActive] = useState(null);
 
   const objectives = getObjectives(domain.id);
   const termCount = countTerms(domain.id);
 
-  // Escape to close, and lock the page behind so only the card scrolls.
+  // Escape to close, lock the page behind so only the card scrolls, and hand
+  // focus back to whatever opened the card once it closes.
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
 
     const previous = document.body.style.overflow;
+    const opener = document.activeElement;
     document.body.style.overflow = 'hidden';
     closeRef.current?.focus();
 
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = previous;
+      opener?.focus?.();
     };
   }, [onClose]);
 
-  const jumpTo = (id) => {
-    setActive(id);
-    const target = bodyRef.current?.querySelector(`[data-objective="${id}"]`);
-    if (target && bodyRef.current) {
-      bodyRef.current.scrollTo({
-        top: target.offsetTop - bodyRef.current.offsetTop - 12,
-        behavior: 'smooth',
-      });
-    }
-  };
-
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-comptia-charcoal/50 backdrop-blur-md"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 bg-comptia-charcoal/50 backdrop-blur-md"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -101,27 +98,10 @@ export default function DomainDetailModal({ domain, onClose }) {
             </button>
           </div>
 
-          {objectives.length > 1 && (
-            <div className="flex flex-wrap gap-1.5 mt-4">
-              {objectives.map((objective) => (
-                <button
-                  key={objective.id}
-                  onClick={() => jumpTo(objective.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-all tabular-nums ${
-                    active === objective.id
-                      ? 'border-red-600 bg-red-600 text-white'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'
-                  }`}
-                >
-                  {objective.id}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Objectives */}
-        <div ref={bodyRef} className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex-1 overflow-y-auto px-6 py-5">
           {objectives.length === 0 ? (
             <div className="py-16 text-center">
               <p className="text-sm font-bold text-comptia-charcoal">
@@ -135,7 +115,7 @@ export default function DomainDetailModal({ domain, onClose }) {
           ) : (
             <div className="space-y-8">
               {objectives.map((objective) => (
-                <section key={objective.id} data-objective={objective.id}>
+                <section key={objective.id}>
                   <div className="flex items-start gap-3 mb-4">
                     <span
                       className="flex-shrink-0 px-2 py-1 rounded text-xs font-black text-white tabular-nums"
@@ -177,7 +157,8 @@ export default function DomainDetailModal({ domain, onClose }) {
           </Link>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

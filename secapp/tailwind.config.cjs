@@ -14,8 +14,9 @@ module.exports = {
   		colors: {
   			// CompTIA brand palette. Red is the accent, charcoal is the
   			// second brand colour used for the dark full-bleed bands, and
-  			// canvas is the neutral page ground. Keep red for accents only —
-  			// it is deliberately never used as an ambient background.
+  			// canvas is the neutral page ground. Red is an accent colour:
+  			// buttons, rules and labels, plus the one closing CTA band on
+  			// Home. It is never an ambient page background.
   			comptia: {
   				red: '#C8102E',
   				'red-dark': '#B01D2A',

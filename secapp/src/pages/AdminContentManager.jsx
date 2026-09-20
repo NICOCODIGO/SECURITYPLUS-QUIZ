@@ -60,10 +60,7 @@ export default function StudyResources() {
   return (
     <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 space-y-8">
       <div className="text-center space-y-4">
-        <div className="inline-flex items-center gap-2 bg-red-50 px-5 py-2.5 rounded-full border-2 border-red-200">
-          <BookOpen className="w-5 h-5 text-red-600" />
-          <span className="text-sm font-bold text-red-700 uppercase tracking-wide">Study Resources</span>
-        </div>
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-red-600">Study resources</p>
         <h1 className="text-5xl font-black text-slate-900 uppercase tracking-tight">Where to Study</h1>
         <p className="text-lg text-slate-700 font-medium max-w-2xl mx-auto">
           Curated list of the best resources to help you prepare for the CompTIA Security+ SY0-701 certification

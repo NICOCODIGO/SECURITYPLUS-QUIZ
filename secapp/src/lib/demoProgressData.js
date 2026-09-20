@@ -1,9 +1,11 @@
 // Sample data used to show what a populated dashboard looks like.
 //
-// Two consumers:
+// Consumers:
 //  - ProgressPreview (Home) uses `demoProgressData` for the marketing teaser
 //    shown to visitors with no progress of their own.
-//  - The Progress page's "Sample data" toggle uses `demoQuizHistory`.
+//  - The Progress page's "Sample data" toggle uses `demoQuizHistory` and
+//    `demoDailyStats`.
+//  - Home's hero art draws its trend chart from `demoQuizHistory`.
 //
 // Neither is ever written to localStorage — sample mode passes the fixture
 // straight into the quizHistoryData selectors, so what you see is rendered by
@@ -43,11 +45,17 @@ const ATTEMPTS = [
   { daysAgo: 17, type: 'mock', count: 40, minutes: 44, improve: -0.03 },
   { daysAgo: 13, domain: 'domain4', count: 20, minutes: 19, improve: 0.00, weakest: true },
   { daysAgo: 10, domain: 'domain5', count: 15, minutes: 11, improve: 0.02 },
+  { daysAgo: 9, type: 'custom', count: 20, minutes: 15, improve: 0.02 },
   { daysAgo: 7, domain: 'domain2', count: 20, minutes: 15, improve: 0.04 },
   { daysAgo: 5, domain: 'domain4', count: 20, minutes: 18, improve: 0.05, weakest: true },
+  { daysAgo: 3, type: 'custom', count: 20, minutes: 14, improve: 0.06 },
   { daysAgo: 2, domain: 'domain3', count: 20, minutes: 14, improve: 0.07 },
   { daysAgo: 1, type: 'mock', count: 40, minutes: 41, improve: 0.08 },
 ];
+
+// Question of the Day lives in its own key, not in quiz_history, so sample
+// mode needs its own stand-in for the streak and lifetime totals.
+export const demoDailyStats = { streak: 6, answered: 18, correct: 14 };
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -60,11 +68,11 @@ const pickQuestions = (domainId, count, offset) => {
 };
 
 const buildAttempt = (spec, seed) => {
-  const isMock = spec.type === 'mock';
+  // Mock and custom quizzes draw from every domain. Spread by exam weight so
+  // the sample breakdown looks plausible (the real MockExam picks at random).
+  const isMixed = spec.type === 'mock' || spec.type === 'custom';
 
-  // A mock spreads its questions across all five domains, weighted by exam
-  // weight, the way MockExam builds a real one.
-  const slices = isMock
+  const slices = isMixed
     ? securityDomains.map((d) => ({
         domainId: d.id,
         count: Math.max(2, Math.round(spec.count * (parseInt(d.weight, 10) / 100))),
@@ -115,11 +123,12 @@ const buildAttempt = (spec, seed) => {
 
   return {
     date: date.toISOString(),
-    type: isMock ? 'mock' : spec.weakest ? 'weakest' : 'domain',
+    type: spec.type || (spec.weakest ? 'weakest' : 'domain'),
     score: totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0,
     questionsCount: totalQuestions,
     durationSeconds: spec.minutes * 60,
-    domainTitle: domain ? domain.numberedTitle : null,
+    // Matches what TakeQuiz stores: CustomQuizBuilder passes "Custom Quiz".
+    domainTitle: domain ? domain.numberedTitle : spec.type === 'custom' ? 'Custom Quiz' : null,
     domainBreakdown,
     answers,
   };

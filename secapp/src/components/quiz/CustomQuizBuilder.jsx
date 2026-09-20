@@ -88,7 +88,7 @@ export default function CustomQuizBuilder() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-black text-comptia-charcoal">Build Your Own Quiz</h1>
+        <h2 className="text-3xl font-black text-comptia-charcoal">Build Your Own Quiz</h2>
         <p className="text-slate-600 mt-2">
           Target exactly what you need to work on — new material, past mistakes, or anything you flagged.
         </p>

@@ -10,7 +10,6 @@
 // its own reward.
 
 import { getAllQuestions, hashQuestion } from './quizData';
-import { getDomainByQuizLabel } from './securityDomains';
 
 const STORAGE_KEY = 'daily_question';
 
@@ -74,7 +73,6 @@ export const getDailyQuestion = (dateKey = getDateKey()) => {
   return {
     ...question,
     id: hashQuestion(question.question),
-    domainMeta: getDomainByQuizLabel(question.domain),
   };
 };
 

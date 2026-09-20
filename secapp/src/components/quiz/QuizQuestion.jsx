@@ -3,7 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { CheckCircle2, XCircle } from "lucide-react";
+import AnswerExplanation from "./AnswerExplanation";
 
+/**
+ * One question with its choices, and the explanation once it is revealed.
+ *
+ * Spacing is kept tight so a question, its explanation and the navigation
+ * all fit on one laptop screen. `footer` renders along the bottom edge —
+ * TakeQuiz puts Previous/Next there so they stay attached to the question.
+ */
 export default function QuizQuestion({
   question,
   questionNumber,
@@ -12,14 +20,13 @@ export default function QuizQuestion({
   onAnswerSelect,
   showResults,
   correctAnswer,
+  footer,
 }) {
   const isCorrect = showResults && selectedAnswer === correctAnswer;
-  const isIncorrect =
-    showResults && selectedAnswer !== correctAnswer && selectedAnswer !== null;
 
   return (
     <Card className="border-2 border-slate-200 shadow-sm rounded-xl">
-      <CardHeader className="pb-3">
+      <CardHeader className="p-5 pb-3 space-y-0">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-slate-600">
             Question {questionNumber} of {totalQuestions}
@@ -28,12 +35,12 @@ export default function QuizQuestion({
           {showResults && (
             <div className="flex items-center gap-2">
               {isCorrect ? (
-                <div className="flex items-center gap-2 text-green-600">
+                <div className="flex items-center gap-1.5 text-green-600">
                   <CheckCircle2 className="w-5 h-5" />
                   <span className="text-sm font-semibold">Correct</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 text-red-600">
+                <div className="flex items-center gap-1.5 text-red-600">
                   <XCircle className="w-5 h-5" />
                   <span className="text-sm font-semibold">Incorrect</span>
                 </div>
@@ -42,12 +49,12 @@ export default function QuizQuestion({
           )}
         </div>
 
-        <CardTitle className="text-lg font-semibold text-slate-900 leading-relaxed mt-2">
+        <CardTitle className="text-lg font-semibold text-slate-900 leading-snug pt-1.5">
           {question.question}
         </CardTitle>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="px-5 pb-5">
         <RadioGroup
           key={`question-${questionNumber}`}
           value={
@@ -56,24 +63,24 @@ export default function QuizQuestion({
           onValueChange={(value) => onAnswerSelect(parseInt(value))}
           disabled={showResults}
         >
-          <div className="space-y-4">
+          <div className="space-y-2">
             {question.choices.map((choice, index) => {
               const isThisCorrect = showResults && index === correctAnswer;
               const isThisSelected = index === selectedAnswer;
               const isThisIncorrect =
                 showResults && isThisSelected && !isThisCorrect;
 
-                // Before the answer is revealed — every question in a mock
-                // exam — a picked choice still needs to look picked, or the
-                // only cue is the small radio dot.
-                const isThisPending = !showResults && isThisSelected;
+              // Before the answer is revealed — every question in a mock
+              // exam — a picked choice still needs to look picked, or the
+              // only cue is the small radio dot.
+              const isThisPending = !showResults && isThisSelected;
 
-                return (
+              return (
                 <Label
                   key={index}
                   htmlFor={`q${questionNumber}-choice${index}`}
                   className={`
-                  flex items-center gap-4 p-4 rounded-lg border transition-all
+                  flex items-center gap-3 px-4 py-3 rounded-lg border transition-all leading-snug
                   ${
                     isThisCorrect
                     ? "bg-green-50 border-green-300"
@@ -86,54 +93,53 @@ export default function QuizQuestion({
                   ${showResults ? "cursor-default" : "cursor-pointer"}
                   `}
                 >
-                  {/* Final perfect circle radio button */}
                   <RadioGroupItem
-  value={index.toString()}
-  id={`q${questionNumber}-choice${index}`}
-  disabled={showResults}
-  className="
-    relative h-5 w-5 rounded-full
-    border border-slate-400
-    data-[state=checked]:border-slate-500
-    data-[state=checked]:bg-slate-200
+                    value={index.toString()}
+                    id={`q${questionNumber}-choice${index}`}
+                    disabled={showResults}
+                    className="
+                      relative h-5 w-5 flex-shrink-0 rounded-full
+                      border border-slate-400
+                      data-[state=checked]:border-slate-500
+                      data-[state=checked]:bg-slate-200
 
-    [&_span]:h-2.5
-    [&_span]:w-2.5
-    [&_span]:rounded-full
-    [&_span]:bg-slate-600
-  "
-/>
-
+                      [&_span]:h-2.5
+                      [&_span]:w-2.5
+                      [&_span]:rounded-full
+                      [&_span]:bg-slate-600
+                    "
+                  />
 
                   {/* Answer Text */}
                   <span className="flex-1 text-slate-700">{choice}</span>
 
                   {isThisCorrect && (
-                  <span className="text-sm font-semibold text-green-700">
-                    ✓ Correct
-                  </span>
+                    <span className="text-sm font-semibold text-green-700 whitespace-nowrap">
+                      ✓ Correct
+                    </span>
                   )}
 
                   {isThisIncorrect && (
-                  <span className="text-sm font-semibold text-red-700">
-                    ✗ Your answer
-                  </span>
+                    <span className="text-sm font-semibold text-red-700 whitespace-nowrap">
+                      ✗ Your answer
+                    </span>
                   )}
                 </Label>
-                );
+              );
             })}
           </div>
         </RadioGroup>
 
         {showResults && question.explanation && (
-          <div className="mt-5 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="font-semibold text-blue-900 mb-1">Explanation</p>
-            <p className="text-sm text-blue-800 leading-relaxed">
-              {question.explanation}
-            </p>
-          </div>
+          <AnswerExplanation question={question} answer={selectedAnswer} className="mt-3" />
         )}
       </CardContent>
+
+      {footer && (
+        <div className="flex items-center justify-between gap-3 border-t-2 border-slate-100 px-5 py-3">
+          {footer}
+        </div>
+      )}
     </Card>
   );
 }

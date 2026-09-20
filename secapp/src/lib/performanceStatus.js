@@ -12,6 +12,9 @@
 
 export const PASSING_ACCURACY = 70;
 
+/** Mock exam pass mark — 750/900 on the real exam is ~83%. */
+export const MOCK_PASS_MARK = 83;
+
 const STATUSES = {
   good: {
     key: 'good',

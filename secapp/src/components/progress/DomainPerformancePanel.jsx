@@ -21,7 +21,7 @@ const STATUS_ICON = {
   none: MinusCircle,
 };
 
-export default function DomainPerformancePanel({ performance }) {
+export default function DomainPerformancePanel({ performance, className = '' }) {
   // Index the attempted rows so every domain can be rendered in exam order,
   // attempted or not.
   const byId = new Map(
@@ -31,17 +31,17 @@ export default function DomainPerformancePanel({ performance }) {
   );
 
   return (
-    <Card className="border-2 border-slate-200 shadow-lg">
-      <CardHeader>
-        <CardTitle className="text-xl font-bold text-comptia-charcoal">
+    <Card className={`border border-slate-200 shadow-sm min-w-0 ${className}`}>
+      <CardHeader className="p-5 pb-2">
+        <CardTitle className="text-base font-bold text-comptia-charcoal">
           Accuracy by Domain
         </CardTitle>
-        <p className="text-sm text-slate-600">
+        <p className="text-xs text-slate-500 mt-1">
           Share of questions answered correctly in each domain, across every attempt.
         </p>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-5">
+      <CardContent className="px-5 pb-5">
+        <div className="space-y-4">
           {securityDomains.map((domain) => {
             const row = byId.get(domain.id);
             const attempted = Boolean(row);
@@ -102,7 +102,7 @@ export default function DomainPerformancePanel({ performance }) {
               to={`/lessons?section=${performance.weakest.domain ? performance.weakest.domain.id : 'weakest'}`}
               className="inline-flex items-center gap-2 text-sm font-bold text-red-600 hover:underline"
             >
-              Practise {performance.weakest.title}, your weakest domain
+              Practice {performance.weakest.title}, your weakest domain
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

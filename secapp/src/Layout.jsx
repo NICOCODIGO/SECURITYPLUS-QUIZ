@@ -1,19 +1,30 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Shield, GraduationCap, BookOpen, BarChart3, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ScrollToTop from "./components/ScrollToTop";
+import Logo from "./components/Logo";
+
+// Filenames are matched exactly, including case and the space in the folder
+// name — the Alpine Docker build resolves these case-sensitively even though
+// the dev machine does not, so "homeicon.png" would build here and 404 there.
+import homeIcon from "./assets/Nav icons/HomeIcon.png";
+import aboutIcon from "./assets/Nav icons/icon.png";
+import practiceIcon from "./assets/home page/openbook.png";
+import progressIcon from "./assets/home page/graphfork.png";
 
 export default function Layout({ children, currentPageName }) {
 
   const navItems = [
-    { name: "Home", path: "/", icon: GraduationCap },
-    { name: "About", path: "/about", icon: Shield },
-    { name: "Lessons", path: "/lessons", icon: BookOpen },
-    { name: "Progress", path: "/progress", icon: BarChart3 },
+    { name: "Home", path: "/", icon: homeIcon },
+    { name: "About", path: "/about", icon: aboutIcon },
+    { name: "Practice", path: "/lessons", icon: practiceIcon },
+    { name: "Progress", path: "/progress", icon: progressIcon },
   ];
 
-  const isQuizPage = currentPageName === "TakeQuiz";
+  // Answering questions gets the whole screen: no nav, no footer, less
+  // padding. Both the quiz and the daily question do.
+  const isFullScreen = ["TakeQuiz", "DailyQuestion"].includes(currentPageName);
 
   return (
     <div className="relative min-h-screen bg-comptia-canvas">
@@ -47,37 +58,33 @@ export default function Layout({ children, currentPageName }) {
           .hover\\:border-red-600:hover { border-color: #C8102E !important; }
         `}</style>
 
-        {!isQuizPage && (
+        {!isFullScreen && (
           <nav className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 shadow-sm" style={{ zIndex: 50 }}>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-center h-16">
+            {/* Full-bleed bar: the brand pins to the far left, the actions to
+                the far right, and the links take the slack in the middle. */}
+            <div className="w-full px-4 sm:px-6 lg:px-10">
+              <div className="flex items-center gap-3 lg:gap-6 h-[4.5rem]">
 
-                <Link to="/" className="flex items-center gap-3 group">
-                  <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all border-4 border-comptia-charcoal/15">
-                    <Shield className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-xl font-bold text-slate-900">EduPrep</h1>
-                    <p className="text-xs text-red-600 font-bold tracking-wide -mt-0.5">SECURITY+</p>
-                  </div>
+                <Link to="/" className="flex items-center gap-3 group shrink-0 md:pr-4 lg:pr-6 md:border-r md:border-slate-200">
+                  <Logo markClassName="w-12 h-12 drop-shadow-md group-hover:drop-shadow-xl transition-all" />
                 </Link>
 
-                <div className="hidden md:flex items-center gap-1">
+                <div className="hidden md:flex flex-1 min-w-0 items-center justify-center gap-0.5 lg:gap-1">
                   {navItems.map((item) => {
-                    const Icon = item.icon;
                     const isActive = window.location.pathname === item.path;
 
                     return (
                       <Link
                         key={item.path}
                         to={item.path}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-medium ${
+                        className={`flex items-center gap-2 px-2.5 lg:px-4 py-2 rounded-lg transition-all font-medium whitespace-nowrap ${
                           isActive
                             ? "bg-red-600 text-white"
                             : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
                         }`}
                       >
-                        <Icon className="w-4 h-4" />
+                        {/* decorative: the link's own text already names it */}
+                        <img src={item.icon} alt="" aria-hidden="true" className="w-4 h-4 object-contain" />
                         {item.name}
                       </Link>
                     );
@@ -85,7 +92,7 @@ export default function Layout({ children, currentPageName }) {
 
                   <Link
                     to="/resources"
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-medium ${
+                    className={`flex items-center gap-2 px-2.5 lg:px-4 py-2 rounded-lg transition-all font-medium whitespace-nowrap ${
                       currentPageName === "AdminContentManager"
                         ? "bg-red-600 text-white"
                         : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
@@ -96,16 +103,17 @@ export default function Layout({ children, currentPageName }) {
                   </Link>
                 </div>
 
-                <Button className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6">
-                  Sign In
-                </Button>
+                <div className="ml-auto shrink-0 md:ml-0 md:pl-4 lg:pl-6 md:border-l md:border-slate-200">
+                  <Button className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6">
+                    Sign In
+                  </Button>
+                </div>
               </div>
             </div>
 
             <div className="md:hidden border-t border-slate-200 bg-white/90 backdrop-blur-md">
-              <div className="flex justify-around py-2">
+              <div className="flex justify-around py-2 px-2">
                 {navItems.map((item) => {
-                  const Icon = item.icon;
                   const isActive = window.location.pathname === item.path;
 
                   return (
@@ -116,7 +124,7 @@ export default function Layout({ children, currentPageName }) {
                         isActive ? "text-red-600 font-semibold" : "text-slate-500"
                       }`}
                     >
-                      <Icon className="w-5 h-5" />
+                      <img src={item.icon} alt="" aria-hidden="true" className="w-5 h-5 object-contain" />
                       <span className="text-xs font-medium">{item.name}</span>
                     </Link>
                   );
@@ -138,15 +146,22 @@ export default function Layout({ children, currentPageName }) {
           </nav>
         )}
 
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+        {/* The quiz page has no nav to clear and must fit one screen, so it
+            gets less vertical padding. */}
+        <main className={`flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${isFullScreen ? 'py-5' : 'py-8'}`}>
+          {children}
+        </main>
 
-        {!isQuizPage && (
-          <footer className="bg-comptia-charcoal mt-20">
+        {!isFullScreen && (
+          // No top margin: <main> already contributes py-8 beneath page
+          // content, and pages ending in a full-width colour band cancel that
+          // themselves so the band meets the footer edge to edge.
+          <footer className="bg-comptia-charcoal">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <span className="h-1 w-10 bg-red-600 rounded-full" />
                 <p className="text-center text-sm text-slate-400">
-                  © {new Date().getFullYear()} EduPrep. Preparing you for CompTIA Security+ certification.
+                  © {new Date().getFullYear()} Certucation. Preparing you for CompTIA Security+ certification.
                 </p>
               </div>
             </div>

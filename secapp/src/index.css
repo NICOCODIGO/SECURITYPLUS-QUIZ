@@ -166,3 +166,44 @@ button[data-state][role="radio"] {
 button[data-state][role="radio"] > span {
   border-radius: 50% !important;
 }
+
+/* ----------------------------------------
+   FULL-BLEED SECTIONS
+
+   Layout's <main> is capped at max-w-7xl with side padding, so a hero placed
+   inside it stops short of the viewport edges. This breaks a section back out
+   to the full viewport width from wherever it sits in that container.
+
+   The margins resolve to "half the container, minus half the viewport" on each
+   side, which cancels the cap and the padding in one step regardless of how
+   wide the container currently is.
+
+   100vw includes the scrollbar on platforms that reserve space for it, so the
+   breakout would otherwise overhang by the scrollbar width; this clips that.
+
+   It must go on body ALONE. Setting overflow-x on html makes html a scroll
+   container and the sticky nav then stops sticking. On body it propagates up
+   to the viewport instead, body itself stays visible, and sticky keeps working.
+---------------------------------------- */
+body {
+  overflow-x: hidden;
+}
+
+.full-bleed {
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}
+
+/* ----------------------------------------
+   BAND TONES
+
+   Full-width sections come in exactly two tones: this dark one, or plain
+   white. Every dark band uses this class so neighbouring bands read as the
+   same material — the Home page previously mixed three different darks, a
+   cream and a red band, which looked patched together. Red stays an accent
+   (buttons, badges), never a band.
+---------------------------------------- */
+.band-dark {
+  background-color: #2F3946;
+  background-image: linear-gradient(to bottom right, #2F3946, #414D5E, #2F3946);
+}

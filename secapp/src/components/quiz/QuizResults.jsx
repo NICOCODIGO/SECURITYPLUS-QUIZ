@@ -14,7 +14,8 @@ import {
   TrendingDown,
 } from 'lucide-react';
 import { getDomainById, getDomainByQuizLabel } from '../data/securityDomains';
-import { statusForAccuracy } from '@/lib/performanceStatus';
+import { statusForAccuracy, MOCK_PASS_MARK as PASS_MARK } from '@/lib/performanceStatus';
+import AnswerExplanation from './AnswerExplanation';
 
 /**
  * Results screen for a finished quiz.
@@ -25,8 +26,6 @@ import { statusForAccuracy } from '@/lib/performanceStatus';
  * a click per question. Filters narrow the list instead, defaulting to the
  * questions you missed when there are any.
  */
-
-const PASS_MARK = 83; // 750/900 on the real exam
 
 const TYPE_META = {
   mock: { icon: FileText, label: 'Exam Complete', noun: 'Exam' },
@@ -392,12 +391,7 @@ function ReviewCard({ row, total, onToggleFlag }) {
           })}
         </div>
 
-        <div className="p-3 bg-slate-50 border-2 border-slate-100 rounded-lg">
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
-            Explanation
-          </p>
-          <p className="text-sm text-slate-700 leading-relaxed">{question.explanation}</p>
-        </div>
+        <AnswerExplanation question={question} answer={answer} />
       </div>
     </div>
   );

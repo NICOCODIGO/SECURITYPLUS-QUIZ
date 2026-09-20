@@ -10,14 +10,23 @@ import {
   getDailyTotals,
   msUntilTomorrow,
 } from '../data/dailyQuestion';
+import AnswerExplanation from './AnswerExplanation';
 
 /**
  * One question, the same for the whole day, with a day streak.
  *
  * Answering does not write to `quiz_history` — see the note in
  * dailyQuestion.js. The streak is the only thing being tracked.
+ *
+ * The question's domain is deliberately not shown, here or on the dashboard
+ * strip: naming the topic is a hint, and the question is meant to be
+ * answered cold.
+ *
+ * `hideTitle` drops the band's heading for the dedicated daily tab, where the
+ * page already carries an h1 saying the same thing; the date and streak stay
+ * because the live streak is owned by this component.
  */
-export default function QuestionOfTheDay() {
+export default function QuestionOfTheDay({ hideTitle = false }) {
   const dateKey = getDateKey();
   const question = useMemo(() => getDailyQuestion(dateKey), [dateKey]);
 
@@ -28,7 +37,6 @@ export default function QuestionOfTheDay() {
   if (!question) return null;
 
   const answered = record !== null;
-  const domain = question.domainMeta;
 
   const handleAnswer = (choiceIndex) => {
     if (answered) return;
@@ -42,16 +50,17 @@ export default function QuestionOfTheDay() {
 
   return (
     <Card className="border-2 border-slate-200 shadow-lg overflow-hidden">
-      {/* Header band carries the domain's own colour ring and icon. */}
       <div className="bg-comptia-charcoal px-6 py-5">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <CalendarDays className="w-5 h-5 text-red-400" />
             <div>
-              <h2 className="text-lg font-black text-white uppercase tracking-wide">
-                Question of the Day
-              </h2>
-              <p className="text-xs text-slate-400">
+              {!hideTitle && (
+                <h2 className="text-lg font-black text-white uppercase tracking-wide">
+                  Question of the Day
+                </h2>
+              )}
+              <p className={hideTitle ? 'text-sm font-bold text-white' : 'text-xs text-slate-400'}>
                 {new Date().toLocaleDateString(undefined, {
                   weekday: 'long',
                   month: 'long',
@@ -71,21 +80,9 @@ export default function QuestionOfTheDay() {
       </div>
 
       <CardContent className="p-6 space-y-5">
-        <div className="flex items-center gap-3 flex-wrap">
-          {domain && (
-            <span className="inline-flex items-center gap-2">
-              <span className={`w-8 h-8 rounded-full bg-white border-2 ${domain.ringColor} flex items-center justify-center`}>
-                <img src={domain.icon} alt="" className="w-4 h-4" />
-              </span>
-              <span className={`text-xs font-bold ${domain.badgeColor} border px-3 py-1 rounded-full`}>
-                {domain.numberedTitle}
-              </span>
-            </span>
-          )}
-          <span className="text-xs font-bold text-slate-600 bg-slate-100 border border-slate-200 px-3 py-1 rounded-full">
-            {question.difficulty}
-          </span>
-        </div>
+        <span className="inline-block text-xs font-bold text-slate-600 bg-slate-100 border border-slate-200 px-3 py-1 rounded-full">
+          {question.difficulty}
+        </span>
 
         <p className="text-lg font-bold text-comptia-charcoal leading-snug">
           {question.question}
@@ -138,7 +135,7 @@ export default function QuestionOfTheDay() {
             >
               {record.correct ? 'Correct' : 'Not quite'}
             </p>
-            <p className="text-sm text-slate-700 leading-relaxed">{question.explanation}</p>
+            <AnswerExplanation question={question} answer={record.choice} bare />
           </div>
         )}
 

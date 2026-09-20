@@ -9,20 +9,20 @@ import { XCircle, ChevronDown, ChevronUp, PartyPopper } from 'lucide-react';
  * before TakeQuiz started storing `answers` has no question-level record, so
  * an older history can legitimately produce an empty panel.
  */
-export default function MostMissedPanel({ missed, hasHistory }) {
+export default function MostMissedPanel({ missed, hasHistory, className = '' }) {
   const [expanded, setExpanded] = useState(null);
 
   return (
-    <Card className="border-2 border-slate-200 shadow-lg">
-      <CardHeader>
-        <CardTitle className="text-xl font-bold text-comptia-charcoal">
+    <Card className={`border border-slate-200 shadow-sm ${className}`}>
+      <CardHeader className="p-5 pb-2">
+        <CardTitle className="text-base font-bold text-comptia-charcoal">
           Topics You Keep Missing
         </CardTitle>
-        <p className="text-sm text-slate-600">
+        <p className="text-xs text-slate-500 mt-1">
           Ranked by how often you have answered them incorrectly.
         </p>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-5 pb-5">
         {missed.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
             {hasHistory ? (
