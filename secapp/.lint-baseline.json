@@ -1,0 +1,12 @@
+{
+  "errors": 5,
+  "warnings": 1,
+  "counts": {
+    "src/components/ui/badge.jsx:react-refresh/only-export-components": 1,
+    "src/components/ui/button.jsx:react-refresh/only-export-components": 1,
+    "src/pages/LessonDetail.jsx:react-hooks/set-state-in-effect": 1,
+    "src/pages/TakeQuiz.jsx:no-unused-vars": 1,
+    "src/pages/TakeQuiz.jsx:react-hooks/exhaustive-deps": 1,
+    "vite.config.js:no-undef": 1
+  }
+}

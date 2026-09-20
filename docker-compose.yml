@@ -1,0 +1,75 @@
+# The whole stack in containers: `docker compose up` from the repo root.
+#
+# This is the "show me it works end to end" entry point. For day-to-day API
+# work prefer `cd server && ./gradlew bootRun`, which starts only Postgres and
+# DynamoDB from server/compose.yaml and runs the app on the host where the
+# debugger can reach it.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: secplus
+      POSTGRES_USER: secplus
+      POSTGRES_PASSWORD: secplus
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U secplus -d secplus']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  dynamodb:
+    image: amazon/dynamodb-local:3.3.1
+    command: ['-jar', 'DynamoDBLocal.jar', '-inMemory', '-sharedDb']
+    ports:
+      - '8000:8000'
+
+  api:
+    build:
+      context: ./server
+    depends_on:
+      postgres:
+        condition: service_healthy
+      dynamodb:
+        condition: service_started
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/secplus
+      DB_USER: secplus
+      DB_PASSWORD: secplus
+      DYNAMODB_ENDPOINT: http://dynamodb:8000
+      AWS_REGION: us-east-1
+      # dynamodb-local ignores the values but the SDK refuses to sign without them
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
+    ports:
+      - '8080:8080'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:8080/actuator/health/readiness']
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 40s
+
+  web:
+    build:
+      context: ./secapp
+    # secapp/Dockerfile runs the Vite dev server, which is what we want here:
+    # the bind mount below gives hot reload against the containerised API.
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      VITE_API_URL: http://localhost:8080
+    ports:
+      - '5173:5173'
+    volumes:
+      - ./secapp:/app
+      - /app/node_modules
+
+volumes:
+  postgres-data:

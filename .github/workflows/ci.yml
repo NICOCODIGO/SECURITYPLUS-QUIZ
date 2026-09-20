@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A second push to the same branch cancels the first — no point paying for a
+# run whose result is already stale.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API (Java 25)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Testcontainers starts a real Postgres against the runner's Docker
+      # daemon, so these are integration tests, not mocks.
+      - name: Build and test
+        working-directory: server
+        run: ./gradlew build --no-daemon
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-report
+          path: server/build/reports/tests/test
+          if-no-files-found: ignore
+
+  web:
+    name: Web (Node 22)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: secapp/package-lock.json
+
+      - name: Install
+        working-directory: secapp
+        run: npm ci
+
+      # Compared against .lint-baseline.json rather than against zero: the 6
+      # pre-existing problems pass, anything new fails. This is a real gate,
+      # not an advisory one — `npm run lint` alone could never be, because it
+      # always exits non-zero here.
+      - name: Lint (vs baseline)
+        working-directory: secapp
+        run: npm run lint:check
+
+      - name: Check question bank objectives
+        working-directory: secapp
+        run: npm run objectives
+
+      # docs/ is only useful while its file references are still true.
+      - name: Check doc references
+        run: node scripts/check-doc-links.mjs
+
+      # Fails if a question was edited without regenerating the seed migration.
+      - name: Check seed migration is current
+        run: node scripts/generate-seed.mjs --check
+
+      - name: Build
+        working-directory: secapp
+        run: npm run build
+
+  image:
+    name: API image builds
+    runs-on: ubuntu-latest
+    needs: api
+    steps:
+      - uses: actions/checkout@v4
+
+      # Proves the deployable artifact builds on every change, without
+      # pushing anything to a registry.
+      - name: Build Docker image
+        run: docker build -t secplus-api:ci ./server

@@ -1,0 +1,38 @@
+# Backing services for local API development.
+#
+# spring-boot-docker-compose picks this file up automatically: `./gradlew
+# bootRun` from server/ starts both containers and wires the datasource to
+# them, then stops them when the app stops. It is intentionally *only* the
+# dependencies — to run the whole stack (API and web included) in containers,
+# use the docker-compose.yml at the repo root instead.
+
+services:
+  postgres:
+    image: 'postgres:17-alpine'
+    environment:
+      POSTGRES_DB: secplus
+      POSTGRES_USER: secplus
+      POSTGRES_PASSWORD: secplus
+    ports:
+      - '5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U secplus -d secplus']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  dynamodb:
+    image: 'amazon/dynamodb-local:3.3.1'
+    # -sharedDb keeps one table set regardless of which fake credentials the
+    # SDK sends; without it each access key gets its own isolated database and
+    # tables appear to vanish between runs.
+    command: ['-jar', 'DynamoDBLocal.jar', '-inMemory', '-sharedDb']
+    # Fixed host port, unlike Postgres above: Boot injects Postgres's random
+    # port for us, but the DynamoDB endpoint is a plain property the app reads,
+    # so it has to land somewhere predictable.
+    ports:
+      - '8000:8000'
+    labels:
+      # Boot has no connection-details support for DynamoDB, so the app reads
+      # app.dynamodb.endpoint instead of having it injected.
+      org.springframework.boot.ignore: 'true'
