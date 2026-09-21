@@ -73,7 +73,9 @@ Each phase ends with the app fully working, deployed or not.
   - ✅ Server-side integrity tests (`ContentSeedTests`) — a bad tag now fails CI.
   - ✅ Public question endpoints — `/questions`, `/objectives`, `/domains`, with CORS,
     deny-by-default security and RFC 7807 errors. 29 tests.
-  - ⬜ Front end fetches from the API, with the bundled bank as fallback.
+  - ✅ Front end hydrates from the API on boot (`questionBank.js`), falling back to the
+    bundled bank when `VITE_API_URL` is unset or the API is unreachable.
+  - **Phase 1 complete.**
 - **2 — Auth.** Register/login/refresh/logout/me. BCrypt strength 12, ~15 min access JWT,
   rotating refresh token in an httpOnly `SameSite=Strict` cookie, rate limiting, generic
   error messages (no user enumeration).

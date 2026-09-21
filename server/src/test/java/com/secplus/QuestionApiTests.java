@@ -9,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.greaterThan;
@@ -116,6 +117,45 @@ class QuestionApiTests {
 	@Test
 	void theLimitIsApplied() throws Exception {
 		mvc.perform(get("/api/v1/questions").param("limit", "7")).andExpect(jsonPath("$", hasSize(7)));
+	}
+
+	@Test
+	void pagingWalksTheWholeBankWithoutRepeating() throws Exception {
+		// The bank is 444 and a single response is capped at 200, so a client
+		// that reads one page gets less than half of it and never knows. This is
+		// the regression that caused: the front end hydrated 200 of 444.
+		java.util.Set<String> ids = new java.util.HashSet<>();
+		int page = 0;
+		int lastSize;
+
+		do {
+			String body = mvc
+				.perform(get("/api/v1/questions").param("limit", "200").param("page", String.valueOf(page)))
+				.andExpect(status().isOk())
+				.andReturn()
+				.getResponse()
+				.getContentAsString();
+
+			java.util.List<String> pageIds = com.jayway.jsonpath.JsonPath.read(body, "$[*].id");
+			lastSize = pageIds.size();
+			ids.addAll(pageIds);
+			page += 1;
+		}
+		while (lastSize == 200 && page < 10);
+
+		assertThat(ids).hasSize(444);
+	}
+
+	@Test
+	void aPageBeyondTheEndIsEmptyRatherThanAnError() throws Exception {
+		mvc.perform(get("/api/v1/questions").param("limit", "200").param("page", "99"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$", hasSize(0)));
+	}
+
+	@Test
+	void aNegativePageIsRejected() throws Exception {
+		mvc.perform(get("/api/v1/questions").param("page", "-1")).andExpect(status().isBadRequest());
 	}
 
 	@Test

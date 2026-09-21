@@ -1,6 +1,7 @@
 // src/App.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { hydrate as hydrateQuestionBank } from './components/data/questionBank';
 import Layout from './Layout';
 import Home from './pages/Home';
 import AboutCertification from './pages/AboutCertification';
@@ -12,6 +13,13 @@ import TakeQuiz from './pages/TakeQuiz';
 import DailyQuestion from './pages/DailyQuestion';
 
 export default function App() {
+  // Swap the bundled question bank for the API's copy once, on boot. Resolves
+  // immediately and changes nothing when VITE_API_URL is unset, which is the
+  // supported default — the app must work with no back end at all.
+  useEffect(() => {
+    hydrateQuestionBank();
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>

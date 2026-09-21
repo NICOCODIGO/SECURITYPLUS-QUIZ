@@ -151,11 +151,31 @@ the streak (that data isn't in the history). Home's two previews fall back to
 is satisfied (two practice quizzes or two mocks — the trend chart plots them apart and needs
 two points to draw a line). Use the switch to check populated layouts without taking quizzes.
 
-## Planned: the `LocalSource` / `RemoteSource` seam
+## The question bank: bundled by default, API when available
 
-Phase 3 fills in `secapp/src/api/apiClient.js` (today a three-line comment file), adds an
-`AuthContext`, and adds `secapp/src/components/data/source.js` holding two implementations
-with identical method names and shapes. The accessor modules above keep their exported signatures and read through
+`secapp/src/api/apiClient.js` is a small fetch wrapper around `VITE_API_URL`. One `ApiError`
+type carries the status, and `isOffline` distinguishes "the server said no" from "the server
+isn't there".
+
+`secapp/src/components/data/questionBank.js` holds whichever copy of the bank is active.
+The bundled one from `quizData.js` is the default **and** the fallback — it is synchronous,
+and nine places depend on that, including module-level derivations like
+`securityDomains.questionCount`. `App.jsx` calls `hydrate()` once on boot, which walks the
+paged API (200 per page, 444 total) and swaps the bank in on success.
+
+Consequences worth knowing:
+
+- Before hydration finishes, callers get the bundled bank. Both hold the same 444 questions
+  today, so only a server-side edit made in the last second is at stake.
+- `securityDomains.questionCount` is derived at import time and always reflects the bundled
+  bank. Use `getBank().total` for a live count.
+- The API returns choices as objects with an `is_correct` flag; `toQuizDataShape` translates
+  them back to `quizData`'s string array plus index, so that assumption lives in one place.
+- Questions are keyed to their **filed** domain label on the way in, so domain quizzes keep
+  asking what they ask today. Switching to the objective's domain is a product decision, not
+  a side effect of moving to the API.
+
+Phase 3 adds an `AuthContext` and `source.js` for *user data* on the same pattern. The accessor modules above keep their exported signatures and read through
 whichever source is active.
 
 **Fallback is a hard requirement.** If `VITE_API_URL` is unset or a request fails, everything

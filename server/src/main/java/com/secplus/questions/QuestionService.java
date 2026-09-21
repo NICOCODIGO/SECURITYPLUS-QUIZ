@@ -8,7 +8,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import org.springframework.data.domain.Limit;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,8 +37,9 @@ public class QuestionService {
 
 	@Transactional(readOnly = true)
 	public List<QuestionView> search(String objective, Short domain, Short filedDomain, String difficulty,
-			int limit) {
-		List<UUID> ids = questions.findIds(objective, domain, filedDomain, difficulty, Limit.of(limit));
+			int limit, int page) {
+		List<UUID> ids = questions.findIds(objective, domain, filedDomain, difficulty,
+				PageRequest.of(page, limit));
 		if (ids.isEmpty()) {
 			return List.of();
 		}

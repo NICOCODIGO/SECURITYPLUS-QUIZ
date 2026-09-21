@@ -44,15 +44,20 @@ public class QuestionController {
 	 *                    for 147 of the 444 questions; exposed so the front end can
 	 *                    keep today's behaviour until the switch is made deliberately
 	 * @param difficulty  Beginner | Intermediate | Advanced
+	 * @param limit       page size, 1–200
+	 * @param page        0-based page index. The bank is 444 questions and no
+	 *                    single call may dump it, so a client that wants all of
+	 *                    them walks pages until a short one comes back.
 	 */
 	@GetMapping("/questions")
 	public List<QuestionView> questions(@RequestParam(required = false) String objective,
 			@RequestParam(required = false) @Min(1) @Max(5) Short domain,
 			@RequestParam(required = false) @Min(1) @Max(5) Short filedDomain,
 			@RequestParam(required = false) String difficulty,
-			@RequestParam(defaultValue = "50") @Min(1) @Max(MAX_LIMIT) int limit) {
+			@RequestParam(defaultValue = "50") @Min(1) @Max(MAX_LIMIT) int limit,
+			@RequestParam(defaultValue = "0") @Min(0) int page) {
 
-		return service.search(objective, domain, filedDomain, difficulty, limit);
+		return service.search(objective, domain, filedDomain, difficulty, limit, page);
 	}
 
 	@GetMapping("/objectives")

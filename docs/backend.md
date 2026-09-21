@@ -58,8 +58,10 @@ entity edit alone, and **never an edit to a migration that has already been appl
 | `GET /domains` | per-domain counts, both by objective and by filing |
 
 `/questions` filters: `objective` (`4.6`), `domain` (1–5, **by objective**), `filedDomain`
-(1–5, the legacy quizData array), `difficulty`, `limit` (1–200, default 50). Both domain
-filters are exposed on purpose — they disagree for 147 questions, and the front end should
+(1–5, the legacy quizData array), `difficulty`, `limit` (page size, 1–200, default 50) and
+`page` (0-based). **The bank is 444 and one response is capped at 200**, so a client that
+wants all of it walks pages until a short one comes back — reading only page 0 silently
+gets less than half. Both domain filters are exposed on purpose — they disagree for 147 questions, and the front end should
 switch from filing to objective as a deliberate decision, not a silent one.
 
 Bad input returns **400** with an RFC 7807 ProblemDetail body naming the parameter.

@@ -46,6 +46,43 @@ server/     Spring Boot API
 infra/      Terraform for the AWS deployment      (not yet)
 ```
 
+## Setting up a new machine
+
+**Prerequisites.** Only Node is needed to run the front end; the rest is for the API.
+
+| Tool | Version | Needed for |
+|---|---|---|
+| Node | 22+ | the front end, and every script in `scripts/` |
+| JDK | 25 | the API. The Gradle *wrapper* is included, but the JDK is not |
+| Docker Desktop | any current | Postgres, DynamoDB Local, and the back-end tests |
+| Git | any current | on Windows, this also supplies Git Bash for `verify.sh` |
+
+```bash
+git clone https://github.com/NICOCODIGO/SECURITYPLUS-QUIZ.git
+cd SECURITYPLUS-QUIZ
+cd secapp && npm install && cd ..
+
+./verify.sh --web      # front end only — should pass with no Docker
+./verify.sh            # everything, once Docker is running
+```
+
+`./verify.sh` is the fastest way to confirm a machine is set up correctly: it
+prints PASS/FAIL/SKIP per check, and reports back-end tests as **SKIPPED** rather
+than passed when Docker isn't running.
+
+### On Windows
+
+- Run `./verify.sh` from **Git Bash**, not PowerShell — it's a bash script.
+- Use `gradlew.bat` instead of `./gradlew` outside Git Bash.
+- Everything in `scripts/` and the Claude Code edit hook are Node, so they work
+  in any shell.
+
+### Picking up where the last session left off
+
+`CLAUDE.md` is the index; the roadmap and current phase live in
+[`docs/architecture.md`](docs/architecture.md). Start there rather than reading
+the whole `docs/` folder.
+
 ## Running it
 
 **Front end only** — no Docker, no database, everything from the bundled question bank:

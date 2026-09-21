@@ -114,12 +114,21 @@ flagged, while `const Icon = rule.icon` is not.
 
 ### The edit hook
 
-`.claude/settings.json` → `.claude/hooks/lint-changed-file.sh` is a `PostToolUse` hook that
+`.claude/settings.json` → `.claude/hooks/lint-changed-file.mjs` is a `PostToolUse` hook that
 lints every `.js`/`.jsx` file written under `secapp/` and exits 2 on anything new, so lint
 regressions surface at the edit rather than at review.
 
 It is baseline-aware and silent for non-JS files, files outside `secapp/`, deleted files, and
 pre-existing problems. A hook that cries wolf gets disabled, so keep it that way.
+
+**Node, not bash, and deliberately so.** The first version was a shell script that used `jq`
+to read the hook payload. Windows ships neither, and the script swallowed the failure — a
+missing `jq` produced an empty path, which produced a silent `exit 0`. The guard would have
+stopped guarding without saying a word. Node is guaranteed present in a Node project and
+behaves identically on macOS, Linux and Windows.
+
+It is wired with the exec form (`"command": "node"`, `"args": [...]`) rather than a shell
+string, so no shell has to expand the path.
 
 ### Doc links
 

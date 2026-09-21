@@ -3,7 +3,7 @@ package com.secplus.questions;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.data.domain.Limit;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,6 +19,8 @@ public interface QuestionRepository extends JpaRepository<Question, UUID> {
 	 * quiz. Selecting ids first keeps the limit in the database.
 	 *
 	 * Filters are all optional — a null parameter means "don't filter on this".
+	 * Paged rather than simply limited so a client that needs the whole bank can
+	 * walk it; the cap on page size stays, so no single call can dump it.
 	 */
 	@Query("""
 			select q.id from Question q
@@ -30,7 +32,8 @@ public interface QuestionRepository extends JpaRepository<Question, UUID> {
 			order by q.objective.code, q.text
 			""")
 	List<UUID> findIds(@Param("objective") String objective, @Param("domain") Short domain,
-			@Param("filedDomain") Short filedDomain, @Param("difficulty") String difficulty, Limit limit);
+			@Param("filedDomain") Short filedDomain, @Param("difficulty") String difficulty,
+			Pageable pageable);
 
 	/**
 	 * The full questions for those ids, with choices and objective fetched in
