@@ -23,20 +23,24 @@
 
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const data = resolve(root, 'secapp/src/components/data');
 
-const { quizQuestions, hashQuestion } = await import(`${data}/quizData.js`);
-const { default: objectives } = await import(`${data}/examObjectives.js`);
+// Node's ESM loader rejects a bare Windows absolute path ("c:\...") as an
+// unsupported URL scheme, so every dynamic import below goes through file://.
+const dataUrl = (file) => pathToFileURL(resolve(data, file)).href;
+
+const { quizQuestions, hashQuestion } = await import(dataUrl('quizData.js'));
+const { default: objectives } = await import(dataUrl('examObjectives.js'));
 
 // choiceRationales.js imports its five files without extensions, which Node
 // ESM rejects, so the merge is repeated here rather than reused.
 const rationales = Object.assign(
   {},
   ...(await Promise.all(
-    [1, 2, 3, 4, 5].map((n) => import(`${data}/rationales/domain${n}.js`).then((m) => m.default)),
+    [1, 2, 3, 4, 5].map((n) => import(dataUrl(`rationales/domain${n}.js`)).then((m) => m.default)),
   )),
 );
 

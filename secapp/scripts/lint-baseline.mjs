@@ -39,7 +39,10 @@ async function collect(patterns) {
 
   for (const result of results) {
     for (const message of result.messages) {
-      const key = `${relative(root, result.filePath)}:${message.ruleId ?? 'fatal-parse-error'}`;
+      // Forward slashes always: the baseline is committed, and without this
+      // every entry reads as both fixed and new when the suite runs on Windows.
+      const path = relative(root, result.filePath).replaceAll('\\', '/');
+      const key = `${path}:${message.ruleId ?? 'fatal-parse-error'}`;
       counts[key] = (counts[key] ?? 0) + 1;
       if (message.severity === 2) errors += 1;
       else warnings += 1;

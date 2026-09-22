@@ -1,2 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# scripts/generate-seed.mjs emits LF and byte-compares the committed file under
+# --check. Native line endings on checkout would make that check fail on Windows
+# no matter what the file contains.
+server/src/main/resources/db/migration/R__seed_content.sql text eol=lf
