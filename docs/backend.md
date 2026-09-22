@@ -3,8 +3,8 @@
 Java 25, Spring Boot 4.1, Gradle wrapper. Lives in `server/`. Schema detail is in
 [database.md](database.md); containers and env vars in [devops.md](devops.md).
 
-**Status:** the public read-only question API is **live and tested** (29 tests). Auth,
-attempts and exam sessions are still design only — each endpoint below is marked.
+**Status:** the public read-only question API and **auth** are live and tested. Attempts and
+exam sessions are still design only — each endpoint below is marked.
 
 ## Why these versions
 
@@ -24,7 +24,8 @@ by hand.
 ```
 server/src/main/java/com/secplus/
   ServerApplication.java
-  auth/  questions/  attempts/  exams/  common/    ← planned
+  auth/  questions/  common/
+  attempts/  exams/                  ← planned
 server/src/main/resources/
   application.properties
   db/migration/V1__init.sql          schema
@@ -33,11 +34,14 @@ server/src/test/java/com/secplus/
   ServerApplicationTests.java        context loads
   SchemaMigrationTests.java          the migration against real Postgres
   ContentSeedTests.java              the seeded question bank landed correctly
+  QuestionApiTests.java              the public question API
+  AuthApiTests.java                  register/login/refresh/logout/me
+  auth/LoginRateLimiterTests.java    window logic — needs no Docker
   TestcontainersConfiguration.java   pinned postgres:17-alpine
   TestServerApplication.java         bootRun with containers
 ```
 
-**15 tests, all passing** against a real Postgres container.
+**52 tests, all passing** against a real Postgres container.
 
 ## Flyway owns the schema
 
@@ -69,8 +73,20 @@ Unauthenticated requests to anything else return **401**, not 403.
 
 ⬜ `GET /questions/daily?date=` — not built.
 
-**Auth** — `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`,
-`GET /auth/me`
+**Auth — ✅ built.** `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`,
+`GET /auth/me`. All under `/api/v1`. Everything but `/auth/me` is `permitAll` — you sign in
+without a token by definition, and you sign out with an expired one more often than not.
+
+The access token comes back in the body; the refresh token only ever leaves as an httpOnly
+cookie scoped to `/api/v1/auth`, so it is not sent with every question request and script
+cannot read it.
+
+`/auth/refresh` and `/auth/logout` require an **`X-Secplus-Client`** header. That is this
+API's CSRF defence: a cross-site form or `<img>` cannot set a custom header without a
+preflight, and CORS only allows the configured origins. It is deliberately not Spring's CSRF
+machinery, which would mean a readable CSRF cookie and a double-submit dance for two
+endpoints on an otherwise stateless API. Omit the header and you get a 4xx, so the front end
+sets it inside `apiClient` rather than at any call site.
 
 **Exams (server session)** — `POST /exams` creates a DynamoDB session and returns questions
 **without** `is_correct`; `PATCH /exams/{id}/answers` autosaves; `POST /exams/{id}/submit`
@@ -126,8 +142,22 @@ Own implementation, not Cognito.
 - Short-lived access JWT (~15 min).
 - **Rotating** refresh token in an httpOnly `SameSite=Strict` cookie. Only the SHA-256 of a
   token is stored, so a database leak hands out no live sessions.
-- Rate limiting on login and register; generic error messages so the endpoints can't be used
-  to enumerate users.
+- Rate limiting on login, register and refresh. In-memory and per-instance, deliberately —
+  see [decisions.md](decisions.md).
+- No JWT library. The Boot BOM's `spring-boot-starter-security-oauth2-resource-server`
+  provides `JwtEncoder`/`JwtDecoder` and bearer authentication, so there is no hand-written
+  filter and no version to track.
+
+**Login cannot be used to enumerate users; register can.** Login returns a byte-identical 401
+for an unknown email and a wrong password, *and* runs a BCrypt verify against a dummy hash
+when the account is absent — without that, an unknown email returns in ~1ms against ~250ms for
+a real one, and the timing is the oracle the shared message just closed. `AuthApiTests`
+asserts the two response bodies are identical.
+
+Register returns **409** on a duplicate, which does confirm an address is taken. That narrows
+the rule knowingly: the only non-enumerable alternative is to accept the registration and
+resolve it by email, and there is no mailer here, so that path ends with someone who believes
+they created an account they can never sign into. Recorded in [decisions.md](decisions.md).
 
 ## Testing
 

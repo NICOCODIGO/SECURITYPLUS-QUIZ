@@ -5,8 +5,10 @@ import java.util.List;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -37,6 +39,27 @@ public class ApiExceptionHandler {
 		problem.setDetail(String.join("; ", errors));
 		problem.setProperty("errors", errors);
 		return problem;
+	}
+
+	/**
+	 * Auth failures carry a title and a detail and nothing else.
+	 *
+	 * No field echoes, no stack traces, no "no account with that email" — the
+	 * message is the whole body precisely so a caller cannot learn anything
+	 * from its shape. Retry-After is set by the rate limiter on its own
+	 * response, not here.
+	 */
+	@ExceptionHandler(AuthException.class)
+	ResponseEntity<ProblemDetail> onAuthFailure(AuthException ex) {
+		ProblemDetail problem = ProblemDetail.forStatus(ex.getStatus());
+		problem.setTitle(ex.getStatus().getReasonPhrase());
+		problem.setDetail(ex.getMessage());
+
+		ResponseEntity.BodyBuilder response = ResponseEntity.status(ex.getStatus());
+		if (ex.getRetryAfterSeconds() > 0) {
+			response.header(HttpHeaders.RETRY_AFTER, Long.toString(ex.getRetryAfterSeconds()));
+		}
+		return response.body(problem);
 	}
 
 	/** "limit: must be greater than or equal to 1" — the parameter, not the method path. */

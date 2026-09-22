@@ -53,6 +53,22 @@ Read by `server/src/main/resources/application.properties`. All have local defau
 | `AWS_REGION` | `us-east-1` | task definition |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | the CloudFront origin |
 | `PORT` | `8080` | App Runner |
+| `AUTH_JWT_SECRET` | empty → random per start | SSM; **must** be set, see below |
+| `AUTH_COOKIE_SAME_SITE` | `Strict` | `Strict` once the API is same-domain |
+| `AUTH_COOKIE_SECURE` | `false` | `true` |
+| `AUTH_TRUST_FORWARDED_FOR` | `false` | `true` behind CloudFront |
+
+Three of those have failure modes worth knowing, because none of them look like a bug:
+
+- **`AUTH_JWT_SECRET` unset** makes the app generate a key at startup and log a WARN. Sessions
+  then die on every restart and deploy — everyone silently signed out. Under 32 bytes fails
+  startup deliberately, rather than signing tokens with a weak key.
+- **`AUTH_TRUST_FORWARDED_FOR=true` on a directly reachable origin** is worse than no rate
+  limiting: the header is caller-supplied, so anyone can pick a fresh bucket per request. Only
+  turn it on where every request arrives through a proxy that overwrites it.
+- **`AUTH_COOKIE_SAME_SITE=Strict` across two domains** means the refresh cookie is never sent,
+  so refresh 401s forever and users are signed out every 15 minutes. Dev can't reveal this —
+  `localhost:5173` and `localhost:8080` are same-site. See [decisions.md](decisions.md).
 
 Locally, `spring-boot-docker-compose` overrides the datasource values with the real container
 host and port, so the defaults above are only a fallback.

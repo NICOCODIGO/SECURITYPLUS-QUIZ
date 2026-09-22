@@ -1,0 +1,34 @@
+package com.secplus.auth;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+/** What the API accepts. */
+public final class AuthRequests {
+
+	private AuthRequests() {
+	}
+
+	/**
+	 * The 72-byte password ceiling is **not** arbitrary and must not be relaxed:
+	 * BCrypt truncates its input at 72 bytes, so without the cap a longer
+	 * passphrase is silently cut and two different passwords open the same
+	 * account. The minimum of 10 is a length floor rather than a character-class
+	 * rule, which is both friendlier and stronger.
+	 */
+	public record RegisterRequest(
+			@NotBlank @Email @Size(max = 320) String email,
+			@NotBlank @Size(min = 10, max = 72) String password,
+			@Size(max = 80) String displayName) {
+	}
+
+	/**
+	 * Login deliberately does not reuse RegisterRequest's constraints. A
+	 * tightened password rule must never turn an existing account's sign-in
+	 * into a 400 — that would lock people out of their own data on the day the
+	 * policy changed.
+	 */
+	public record LoginRequest(@NotBlank String email, @NotBlank String password) {
+	}
+}

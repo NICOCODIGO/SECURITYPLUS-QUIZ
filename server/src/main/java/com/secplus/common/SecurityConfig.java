@@ -12,6 +12,8 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -32,12 +34,19 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
 	@Bean
-	SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+	SecurityFilterChain securityFilterChain(HttpSecurity http,
+			JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
 		return http
-			// No cookies or sessions on the API: phase 2 authenticates with a
-			// bearer token, so there is no session for CSRF to protect. The
-			// refresh-token cookie that arrives with it is same-site and only
-			// ever read by /auth/refresh, which will re-enable CSRF for itself.
+			// No sessions on the API: requests authenticate with a bearer token,
+			// so there is no session for CSRF to protect.
+			//
+			// The refresh cookie is the one exception, and it is defended
+			// without Spring's CSRF machinery: /auth/refresh and /auth/logout
+			// require an `X-Secplus-Client` header, which a cross-site form or
+			// <img> cannot set without triggering a preflight that
+			// corsConfigurationSource refuses. Re-enabling CSRF for two
+			// endpoints would mean shipping a readable CSRF cookie and a
+			// double-submit dance on an otherwise stateless API.
 			.csrf(csrf -> csrf.disable())
 			.cors(Customizer.withDefaults())
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -50,9 +59,17 @@ public class SecurityConfig {
 			// in, 403 means signing in again will not help.
 			.exceptionHandling(handling -> handling
 				.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+			.oauth2ResourceServer(oauth2 -> oauth2
+				.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers(HttpMethod.GET, "/api/v1/questions", "/api/v1/objectives",
 						"/api/v1/domains")
+					.permitAll()
+				// You sign in without a token by definition, and you sign out
+				// with an expired one more often than not. /auth/me is the only
+				// one that falls through to authenticated().
+				.requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login",
+						"/api/v1/auth/refresh", "/api/v1/auth/logout")
 					.permitAll()
 				// Liveness and readiness only. `management.endpoint.health.show-details`
 				// is `when-authorized`, so anonymous callers get UP/DOWN and nothing
@@ -61,6 +78,24 @@ public class SecurityConfig {
 					.permitAll()
 				.anyRequest().authenticated())
 			.build();
+	}
+
+	/**
+	 * Maps the token's `roles` claim to Spring's ROLE_-prefixed authorities.
+	 *
+	 * The default converter reads `scope`/`scp` and would silently grant an
+	 * authenticated user no authorities at all, which only shows up later as a
+	 * 403 on the first @PreAuthorize.
+	 */
+	@Bean
+	JwtAuthenticationConverter jwtAuthenticationConverter() {
+		JwtGrantedAuthoritiesConverter authorities = new JwtGrantedAuthoritiesConverter();
+		authorities.setAuthoritiesClaimName("roles");
+		authorities.setAuthorityPrefix("ROLE_");
+
+		JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+		converter.setJwtGrantedAuthoritiesConverter(authorities);
+		return converter;
 	}
 
 	/**
