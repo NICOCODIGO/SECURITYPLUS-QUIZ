@@ -5,3 +5,8 @@
 # --check. Native line endings on checkout would make that check fail on Windows
 # no matter what the file contains.
 server/src/main/resources/db/migration/R__seed_content.sql text eol=lf
+
+# Shell scripts stay LF everywhere. Checked out with CRLF they fail under Git
+# Bash with "$'\r': command not found", which reads as a broken script rather
+# than a line-ending problem.
+*.sh text eol=lf
