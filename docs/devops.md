@@ -179,9 +179,50 @@ runs fine, it just serves yesterday's content. Wired into `verify.sh` and CI.
 - The front end has **no test framework**. Front-end verification is `./verify.sh --web`
   plus loading pages against `npm run dev`.
 
-## Deployment target (Phase 6, not built)
+## Logging and the request id
+
+Every request carries a correlation id, put into the MDC by
+`server/src/main/java/com/secplus/common/RequestIdFilter.java` and rendered into every log line
+by `logging.pattern.level`:
+
+```
+WARN [secplus-api,traceme123] ... RefreshTokenService : Refresh token reuse detected for user ...
+```
+
+An inbound `X-Request-Id` is reused — CloudFront sets one, so a CloudWatch entry and an access
+log line can be joined up — otherwise one is generated. It is always echoed back on the
+response, so someone reporting a problem can quote the id of the exact request that failed.
+Inbound values are stripped to `[A-Za-z0-9._-]` and truncated: the header is caller-supplied,
+and a newline in it would let anyone forge a log entry.
+
+The filter runs at `HIGHEST_PRECEDENCE`, because a request rejected by a later filter — expired
+token, refused preflight — is exactly the one worth correlating. It clears the MDC in a
+`finally`, since servlet threads are pooled and a leftover id would stamp the next unrelated
+request.
+
+**Deployed, logs are JSON.** `application-prod.properties` sets
+`logging.structured.format.console=ecs`, so CloudWatch Logs Insights can query fields instead of
+regexing a message. Boot emits ECS natively — no encoder dependency, no `logback-spring.xml`.
+Locally the format stays plain text, because JSON in a terminal is unreadable.
+
+`application-prod.properties` also sets `app.auth.secret=${AUTH_JWT_SECRET}` with no default, so
+a deployed container **fails to start** rather than generating a throwaway key and signing every
+user out on each deploy.
+
+## Deployment target (Phase 6, in progress)
 
 Front end to S3 + CloudFront. API as Docker → ECR → App Runner. RDS `t4g.micro` on the
-12-month free tier, DynamoDB on-demand. Secrets in SSM Parameter Store. Terraform in
-`infra/`. CloudWatch logs plus a couple of alarms, and structured JSON logging carrying a
-request id — `logging.pattern.level` already includes `%X{requestId}`.
+12-month free tier. Secrets in SSM Parameter Store. Terraform in `infra/`. CloudWatch logs plus
+a couple of alarms.
+
+**One CloudFront distribution, two origins** — default to S3, `/api/*` to App Runner. Not a
+preference: the refresh cookie is `SameSite=Strict`, so an API on a separate domain would never
+receive it and every session would die after 15 minutes. Local dev cannot reveal this because
+`localhost:5173` and `localhost:8080` are the same site.
+
+The `/api/*` behaviour must disable caching and forward all headers, cookies and query strings.
+CloudFront strips `Authorization` and `Cookie` by default, and a cached `/auth/me` would serve
+one account's details to another.
+
+No DynamoDB yet — nothing reads `app.dynamodb.endpoint` and there is no AWS SDK on the
+classpath. It arrives with Phase 4.

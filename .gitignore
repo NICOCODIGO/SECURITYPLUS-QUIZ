@@ -10,3 +10,16 @@
 .env
 .env.local
 *.local.properties
+
+# Terraform.
+#
+# State is the important one: it holds the generated RDS password and the JWT
+# signing key in PLAINTEXT, so committing it publishes both. The provider lock
+# file is deliberately NOT ignored — it pins provider versions and belongs in
+# git.
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/*.tfvars
+infra/tfplan
+crash.log
