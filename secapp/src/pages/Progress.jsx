@@ -1,14 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import {
   Target,
   Clock,
   Award,
   ListChecks,
-  FlaskConical,
   ArrowRight,
 } from 'lucide-react';
 import DomainPerformancePanel from '../components/progress/DomainPerformancePanel';
@@ -17,6 +15,7 @@ import MostMissedPanel from '../components/progress/MostMissedPanel';
 import RecentActivityPanel from '../components/progress/RecentActivityPanel';
 import PracticeMixPanel from '../components/progress/PracticeMixPanel';
 import KpiTile from '../components/progress/KpiTile';
+import ProgressGate from '../components/progress/ProgressGate';
 import {
   getQuizHistory,
   getQuizStats,
@@ -28,7 +27,7 @@ import {
   formatDuration,
 } from '../components/data/quizHistoryData';
 import { getDailyTotals, getStreak } from '../components/data/dailyQuestion';
-import { demoQuizHistory, demoDailyStats } from '@/lib/demoProgressData';
+import { useAuth } from '@/auth/AuthContext';
 import { MOCK_PASS_MARK } from '@/lib/performanceStatus';
 
 /**
@@ -41,33 +40,37 @@ import { MOCK_PASS_MARK } from '@/lib/performanceStatus';
  * then a grid of panels that pair up side by side from lg, so the whole
  * picture reads without a long single-column scroll.
  *
- * The "Sample data" switch swaps the history array for a fixture and feeds it
- * through the identical selectors, so the populated layout can be reviewed
- * before taking a single quiz. It never writes to localStorage — turning it
- * off returns you to your real results untouched.
- *
- * When real auth arrives, this is where per-user data gets fetched instead of
- * read from localStorage.
+ * Study data is only kept while an account is signed in, so the accessors
+ * below return nothing at all when signed out and ProgressGate explains why.
+ * See components/data/persistence.js.
  */
 export default function Progress() {
-  const [showSample, setShowSample] = useState(false);
+  const { status } = useAuth();
+  const signedIn = status === 'authenticated';
 
-  const realHistory = useMemo(() => getQuizHistory(), []);
-  const history = showSample ? demoQuizHistory : realHistory;
+  // Keyed on `signedIn` rather than `[]`, because auth resolves a moment after
+  // mount and a read taken before it lands would be empty and never retried.
+  // The accessors gate themselves too; saying it here as well keeps the reason
+  // this page can be empty visible at the point the data arrives.
+  const history = useMemo(() => (signedIn ? getQuizHistory() : []), [signedIn]);
+  const daily = useMemo(
+    () => (signedIn ? { ...getDailyTotals(), streak: getStreak() } : { answered: 0, correct: 0, streak: 0 }),
+    [signedIn]
+  );
 
   const stats = useMemo(() => getQuizStats(history), [history]);
   const modes = useMemo(() => getModeStats(history), [history]);
   const performance = useMemo(() => getDomainPerformance(history), [history]);
-  // The daily question keeps its own key, so sample mode swaps it separately.
-  const daily = useMemo(
-    () => (showSample ? demoDailyStats : { ...getDailyTotals(), streak: getStreak() }),
-    [showSample]
-  );
   const trend = useMemo(() => getScoreTrend(history), [history]);
   const missed = useMemo(() => getMostMissed(history, 5), [history]);
   const attempts = useMemo(() => getRecentAttempts(history, 8), [history]);
 
   const hasHistory = history.length > 0;
+
+  // Signed out these tiles are zero because nothing is recorded, not because
+  // no quizzes have been taken — so they must not say "take a quiz to get
+  // started", which implies a quiz would change them.
+  const notTracked = signedIn ? 'No quizzes yet' : 'Not tracked while signed out';
   const averageQuizTime =
     stats.attempts > 0 ? formatDuration(Math.round(stats.studySeconds / stats.attempts)) : null;
 
@@ -84,15 +87,6 @@ export default function Progress() {
             </div>
 
             <div className="flex items-center gap-3 flex-wrap">
-              <label className="inline-flex items-center gap-3 rounded-lg border-2 border-slate-200 bg-white px-3 py-2 cursor-pointer">
-                <FlaskConical className="w-4 h-4 text-amber-600" />
-                <span className="text-sm font-bold text-comptia-charcoal">Sample data</span>
-                <Switch
-                  checked={showSample}
-                  onCheckedChange={setShowSample}
-                  aria-label="Preview the dashboard with sample data"
-                />
-              </label>
               <Link to="/lessons">
                 <Button className="bg-red-600 hover:bg-red-700 text-white font-bold gap-2">
                   Take a quiz
@@ -108,7 +102,7 @@ export default function Progress() {
               tint="bg-sky-600"
               label="Quizzes taken"
               value={stats.attempts}
-              detail={hasHistory ? `${stats.questionsAnswered} questions answered` : 'No quizzes yet'}
+              detail={hasHistory ? `${stats.questionsAnswered} questions answered` : notTracked}
             />
             {/* "Accuracy", not "Average score": it is every question you have
                 answered, right over asked, so it says how often you get a
@@ -121,7 +115,7 @@ export default function Progress() {
               detail={
                 hasHistory
                   ? `${stats.correctAnswers} of ${stats.questionsAnswered} questions correct`
-                  : 'Take a quiz to get started'
+                  : notTracked
               }
             />
             <KpiTile
@@ -129,30 +123,24 @@ export default function Progress() {
               tint="bg-emerald-600"
               label="Best quiz score"
               value={`${stats.bestScore}%`}
-              detail={stats.bestScoreLabel ? `Your best: ${stats.bestScoreLabel}` : 'No quizzes yet'}
+              detail={stats.bestScoreLabel ? `Your best: ${stats.bestScoreLabel}` : notTracked}
             />
             <KpiTile
               icon={Clock}
               tint="bg-amber-600"
               label="Time studying"
               value={formatDuration(stats.studySeconds)}
-              detail={averageQuizTime ? `Answering questions · about ${averageQuizTime} per quiz` : 'Time spent answering questions'}
+              detail={averageQuizTime ? `Answering questions · about ${averageQuizTime} per quiz` : notTracked}
             />
           </div>
         </div>
       </section>
 
-      {showSample && (
-        <div className="flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm">
-          <FlaskConical className="w-4 h-4 text-amber-700 flex-shrink-0" />
-          <p className="text-amber-900">
-            <span className="font-bold">Showing sample data, not your results.</span> Nothing here is saved. Switch it
-            off to see your own progress.
-          </p>
-        </div>
-      )}
-
-      {!hasHistory ? (
+      {!signedIn ? (
+        // Not "no results yet" — there is no data because none is kept while
+        // signed out, and saying the other thing would be untrue.
+        <ProgressGate />
+      ) : !hasHistory ? (
         // One clear call to action beats a grid of empty panels.
         <Card className="border border-slate-200 shadow-sm">
           <CardContent className="p-12 text-center space-y-4">
@@ -162,7 +150,7 @@ export default function Progress() {
             <h2 className="text-2xl font-black text-comptia-charcoal">No quiz results yet</h2>
             <p className="text-slate-600 max-w-lg mx-auto">
               Take a domain quiz or a mock exam and this dashboard fills in — accuracy per domain, your score trend,
-              and the questions you keep getting wrong. Flip on sample data above to see what that looks like first.
+              and the questions you keep getting wrong.
             </p>
             <Link to="/lessons" className="inline-block">
               <Button className="bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-6 rounded-lg inline-flex items-center gap-2">

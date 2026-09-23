@@ -94,10 +94,36 @@ rather than calling `localStorage` directly.**
 
 | Key | Module | Holds |
 |---|---|---|
-| `quiz_history` | `quizHistoryData.js` | Every finished attempt. The main one. |
-| `daily_question` | `dailyQuestion.js` | Question-of-the-Day answers and streak |
-| `flagged_questions` | `questionPools.js` | Questions flagged during a quiz |
+| `quiz_history:<user id>` | `quizHistoryData.js` | Every finished attempt. The main one. |
+| `daily_question:<user id>` | `dailyQuestion.js` | Question-of-the-Day answers and streak |
+| `flagged_questions:<user id>` | `questionPools.js` | Questions flagged during a quiz |
 | `security_plus_progress` | `progressData.js` | Lesson completion — **never written**, see below |
+
+The first three are **namespaced by account**, via `scopedKey()` in `persistence.js`. Two
+people share a browser more often than "local storage" suggests — a family laptop, a library
+machine — and without the namespace the second person to sign in reads the first one's history
+as their own and appends to it. `security_plus_progress` is not namespaced because nothing
+writes it.
+
+### Persistence requires an account
+
+`secapp/src/components/data/persistence.js` exports **one** predicate,
+`isPersistenceAllowed()`, and the first three accessors above consult it before every read and
+every write. It is true only while an account is signed in.
+
+Signed out, a quiz is taken, scored and reviewed exactly as normal — the score lives in
+`TakeQuiz`'s own state — but nothing is written and nothing previously written is read.
+`getQuizHistory()` returns `[]`, so every selector over it returns its empty shape and the
+whole dashboard, the streak and the weakest-subject pool are empty by design.
+
+Two things to hold onto:
+
+- **Nothing is ever deleted.** A signed-out browser stops *reading* its old `quiz_history`;
+  the key is left alone. The policy is one line and reversing it restores the data.
+- **With `VITE_API_URL` unset there is no account**, so nothing persists at all. This narrows
+  the fallback rule below: a clean checkout still runs every quiz and the whole bank, but
+  keeps no results. `ProgressGate` says so on the page rather than showing an empty dashboard.
+  Recorded in [decisions.md](decisions.md).
 
 ### `quiz_history` and the selector pattern
 
@@ -112,8 +138,8 @@ rather than calling `localStorage` directly.**
 Progress and the Practice dashboard are both **pure selectors over this array** —
 `getQuizStats`, `getModeStats`, `getDomainPerformance`, `getScoreTrend`, `getMostMissed`,
 `getRecentAttempts`. Every one takes the history array as an optional argument, which is how
-the Progress sample-data switch renders a populated dashboard through the exact same code
-path.
+Home's `ProgressPreview` renders a populated teaser from a fixture through the exact same
+code path as real results.
 
 **That argument is also the seam the back end plugs into.** Phase 3 returns attempts from
 `GET /me/attempts` in exactly this record shape, so the selectors work unchanged and no
@@ -144,12 +170,14 @@ separately: in the Practice page's daily strip (a link to `/daily`) and in Progr
 
 ### Sample data
 
-Progress has a "Sample data" switch feeding `secapp/src/lib/demoProgressData.js` through the
-same selectors without writing storage — `demoQuizHistory` for history, `demoDailyStats` for
-the streak (that data isn't in the history). Home's two previews fall back to
-`demoQuizHistory` as well, labelled as sample, and switch to real results once `canDrawTrend`
-is satisfied (two practice quizzes or two mocks — the trend chart plots them apart and needs
-two points to draw a line). Use the switch to check populated layouts without taking quizzes.
+Home's two previews fall back to `demoQuizHistory` from `secapp/src/lib/demoProgressData.js`,
+labelled as sample, and switch to real results once `canDrawTrend` is satisfied (two practice
+quizzes or two mocks — the trend chart plots them apart and needs two points to draw a line).
+The fixture goes through the same selectors and never writes storage.
+
+**Home is the only place a fixture is shown.** Progress used to have a "Sample data" switch
+reading the same file; it was removed — a demo surface inside the product. See
+[decisions.md](decisions.md).
 
 ## The question bank: bundled by default, API when available
 

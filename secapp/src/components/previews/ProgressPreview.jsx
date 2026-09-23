@@ -71,7 +71,9 @@ export default function ProgressPreview({ className = '' }) {
     <div className={`space-y-4 ${className}`}>
       {!hasReal && (
         <p className="text-center text-xs font-bold uppercase tracking-wide text-slate-400">
-          Sample data — take a couple of quizzes to see your own
+          {/* Not "take a couple of quizzes to see your own" any more: results
+              are only kept while signed in, so quizzes alone won't fill this. */}
+          Sample data — sign in to see your own
         </p>
       )}
 

@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import AuthNav from "@/components/auth/AuthNav";
 import ScrollToTop from "./components/ScrollToTop";
 import Logo from "./components/Logo";
 
@@ -103,11 +103,7 @@ export default function Layout({ children, currentPageName }) {
                   </Link>
                 </div>
 
-                <div className="ml-auto shrink-0 md:ml-0 md:pl-4 lg:pl-6 md:border-l md:border-slate-200">
-                  <Button className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6">
-                    Sign In
-                  </Button>
-                </div>
+                <AuthNav />
               </div>
             </div>
 

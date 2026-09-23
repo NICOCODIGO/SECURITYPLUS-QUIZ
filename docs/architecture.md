@@ -8,10 +8,11 @@ A free study platform for the CompTIA Security+ **SY0-701** exam: lessons, domai
 a 90-question mock exam, a custom quiz builder, Question of the Day, and a progress
 dashboard.
 
-The front end is complete and in use. The back end now **serves the question bank** over a
-public read-only API; accounts, sync and exam sessions are not built yet. All user state is
-still browser storage, and `secapp/src/api/apiClient.js` is still a three-line comment file
-— the front end does not call the API yet.
+The front end is complete and in use. The back end **serves the question bank** over a public
+read-only API and **has accounts** — register, login, rotating refresh, logout, me. Sync and
+exam sessions are not built yet, so all study data is still browser storage for everyone,
+signed in or not. An account currently adds nothing but itself; that is deliberate, and why
+the merge-on-signup rule is not yet in play. See [decisions.md](decisions.md).
 
 ## Tech stack
 
@@ -40,16 +41,22 @@ verify.sh   the one verification command
 
 ## The product rule everything inherits
 
-**Everything is free without an account.** All 444 questions, every quiz mode and the whole
-progress dashboard work anonymously against browser storage.
+**Studying is free without an account.** All 444 questions and every quiz mode work
+anonymously. **Progress reporting does not** — results are only kept while signed in.
 
 | | Anonymous | Account |
 |---|---|---|
 | Lessons, quizzes, mock exam, custom builder, Question of the Day | ✅ | ✅ |
-| Progress dashboard | ✅ browser storage, last 50 attempts | ✅ durable, unlimited |
-| Cross-device sync · streak that survives a cache clear | — | ✅ |
-| Saved custom quizzes · synced flags | — | ✅ |
-| Resume an interrupted mock exam | — | ✅ |
+| Answers graded, score and explanations shown | ✅ | ✅ |
+| Results kept after the page closes | — | ✅ |
+| Progress dashboard · streak · weakest-subject drill | — | ✅ |
+| Cross-device sync | — | Phase 3 |
+| Resume an interrupted mock exam | — | Phase 4 |
+
+That second row is the deliberate narrowing: you can study as much as you like signed out, but
+nothing is recorded, so there is no history to chart. One predicate decides it —
+`secapp/src/components/data/persistence.js`. See [decisions.md](decisions.md) for the
+reasoning and what it costs.
 
 Two rules that follow from this, and that everything else is built around:
 
@@ -76,9 +83,13 @@ Each phase ends with the app fully working, deployed or not.
   - ✅ Front end hydrates from the API on boot (`questionBank.js`), falling back to the
     bundled bank when `VITE_API_URL` is unset or the API is unreachable.
   - **Phase 1 complete.**
-- **2 — Auth.** Register/login/refresh/logout/me. BCrypt strength 12, ~15 min access JWT,
-  rotating refresh token in an httpOnly `SameSite=Strict` cookie, rate limiting, generic
-  error messages (no user enumeration).
+- **2 — Auth.** ✅ Done, server side. Register/login/refresh/logout/me, BCrypt 12, 15-minute
+  access JWT, rotating refresh in an httpOnly `SameSite=Strict` cookie scoped to
+  `/api/v1/auth`, reuse detection that revokes the whole token family, in-memory rate
+  limiting, and login responses that are byte-identical for a wrong password and an unknown
+  email. Register returns 409 on a duplicate — a documented narrowing, see
+  [decisions.md](decisions.md). 52 tests. No new migration: `V1__init.sql` already had
+  `users` and `refresh_tokens`.
 - **3 — Sync + merge-on-signup.** `/me/attempts`, `/me/flags`, `/me/daily`, `/me/presets`,
   the `RemoteSource`, and `POST /me/import` merging by `(legacy_hash, submitted_at)` so a
   double import can't duplicate.

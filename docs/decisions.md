@@ -11,9 +11,14 @@ If you think an entry should be reversed, say so and ask — don't just do it.
 | Decision | Why | Do not |
 |---|---|---|
 | **No leaderboard, ranking or percentiles** | An account exists to keep one person's own data safe, not to compare them to others. Rejected outright. | Add ranking, percentiles, public profiles, shared scores, or any cross-user visibility |
-| **No feature moves behind the login** | Everything free stays free; an account adds durability, never access | Gate an existing feature on sign-in |
+| **~~No feature moves behind the login~~ — narrowed** | Still true for *studying*: every quiz, mock exam, the full 444-question bank and Question of the Day work with no account. **But progress *reporting* now requires one** — study data is kept only while signed in. Chosen deliberately, with the consequences below on the table | Gate a *studying* feature on sign-in. The bank and the quizzes stay open |
+| **Study data is kept only while signed in** | Signed out, a quiz is taken and scored normally but nothing is written and nothing previously written is read. One predicate: `secapp/src/components/data/persistence.js` | Scatter the check — every accessor asks that one function |
+| **Storage keys are namespaced by user id** | Once persistence is gated on an account, a global key means the second person to sign in on a shared browser reads the first one's history as their own. An account exists to keep one person's data safe; a shared key is the opposite | Add a storage key without `scopedKey()` |
+| **Pre-account keys are abandoned, not migrated** | An un-namespaced `quiz_history` belongs to whoever used the browser before accounts existed. Adopting it into the first account that signs in would be the same cross-user bug in a different shape | Auto-import old local data on first sign-in. Phase 3's `POST /me/import` is a *deliberate* merge the user asks for |
 | **Merge on signup is mandatory** | Signing up must never cost someone their anonymous history | Ship auth without the import path |
 | **Mock exams are server-held for *resume*, not anti-cheat** | With nothing to rank there is nobody to cheat. The real problem is losing 90 minutes to a closed tab | Justify the exam session API with integrity arguments — it won't survive scrutiny |
+| **Register returns 409 on a duplicate email** | A knowing narrowing of "no user enumeration". The alternative needs a mailer this project doesn't have, and without one it produces someone who believes they made an account they can't sign into. Login stays fully non-enumerable | "Fix" the 409 into a 201, or relax login's identical-response rule to match |
+| **The Progress sign-in gate is *soft*** | It blurs and offers an account, but dismisses — so nothing is actually behind the login, and rule 2 holds. A hard gate lived here from `a4d7e14` to `3f903ce` and its auth was fake | "Complete" it into a hard gate, or drop the dismiss |
 
 ## Home page
 
@@ -34,6 +39,7 @@ If you think an entry should be reversed, say so and ask — don't just do it.
 | **Stat pills in the Practice header** | That is Progress's job | Put stats back on the Practice header |
 | **Source links gathered at the page foot** | Each source belongs underneath the claim it backs | Collect `SourceLink`s into a list |
 | **Mock scores on the practice trend line** | A 10-question quiz on the same line as a 90-question mock made a bad quiz look like a failed exam | Merge `getScoreTrend`'s `practice` and `mock` series |
+| **"Sample data" switch on Progress** | A demo fixture in a product surface. Home already shows a populated dashboard to new visitors, labelled as sample; the page you open to see *your* results should not offer to show you someone else's | Add a demo/sample toggle to Progress |
 
 ## Unsourced or misleading copy
 
@@ -59,6 +65,8 @@ Still on the page and needing care:
 | AWS Cognito | Own bcrypt + JWT with rotating refresh tokens |
 | AWS Amplify | S3 + CloudFront |
 | MySQL | PostgreSQL |
+| A JWT library (jjwt, Nimbus direct) | `spring-boot-starter-security-oauth2-resource-server` — the Boot BOM manages it, so no version to pin and no hand-written filter |
+| Bucket4j for rate limiting | A ~60-line in-memory map. One App Runner instance with no shared cache means a library buys the same per-instance guarantee plus a dependency; at the point it scales past one instance the question is Redis-or-not |
 | TypeScript | Plain JSX (the original README claimed TS; it never was) |
 | React Query | Plain fetch through the accessor modules |
 | Spring Boot 3.x | 4.1 — Initializr no longer offers 3.x at all |
@@ -77,6 +85,9 @@ Not bugs. Known, chosen, and waiting.
 | **A production image for `secapp/`** | Phase 6 serves `dist/` from S3 + CloudFront | May never be needed |
 | **Front-end test framework** | None configured | Considered after Phase 1 |
 | **Fixing the 6 lint problems** | Baseline-tracked instead, so they can't grow | `npm run lint:check` |
+| **`source.js` / `RemoteSource`** | Building the source switch before the import path exists *is* "ship auth without the import path". Accessor modules keep reading localStorage for everyone, signed in or not | Phase 3, in the same change as `POST /me/import` |
+| **`GET /me/attempts`** | Shipping the read before the merge is the exact sequence the merge-on-signup rule forbids. Phase 2's server surface is the five `/auth/*` endpoints and nothing else | Phase 3 |
+| **`SameSite=None` for the refresh cookie** | Fix it by construction instead: an `/api/*` behaviour on the same CloudFront distribution makes the cookie first-party and removes CORS. `None` makes it third-party, the category browsers are removing | Phase 6 |
 
 ## Naming oddities that are not mistakes
 

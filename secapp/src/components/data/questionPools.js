@@ -8,14 +8,18 @@
 
 import { getAllQuestions, hashQuestion } from './quizData';
 import { getQuizHistory } from './quizHistoryData';
+import { isPersistenceAllowed, scopedKey } from './persistence';
 
+/** Namespaced per account by scopedKey — see persistence.js. */
 const FLAG_KEY = 'flagged_questions';
 
 /* ---------------------------------------------------------------- flags -- */
 
 export const getFlaggedIds = () => {
+  if (!isPersistenceAllowed()) return new Set();
+
   try {
-    const stored = JSON.parse(localStorage.getItem(FLAG_KEY) || '[]');
+    const stored = JSON.parse(localStorage.getItem(scopedKey(FLAG_KEY)) || '[]');
     return new Set(Array.isArray(stored) ? stored : []);
   } catch {
     return new Set();
@@ -24,7 +28,13 @@ export const getFlaggedIds = () => {
 
 export const isFlagged = (questionId) => getFlaggedIds().has(questionId);
 
-/** Adds or removes a flag; returns true if the question is now flagged. */
+/**
+ * Adds or removes a flag; returns true if the question is now flagged.
+ *
+ * Signed out this only reports what the caller asked for — TakeQuiz mirrors
+ * flags into React state, so the icon still toggles within the quiz. It just
+ * does not survive the page.
+ */
 export const toggleFlag = (questionId) => {
   const flagged = getFlaggedIds();
   const nowFlagged = !flagged.has(questionId);
@@ -32,11 +42,16 @@ export const toggleFlag = (questionId) => {
   if (nowFlagged) flagged.add(questionId);
   else flagged.delete(questionId);
 
-  localStorage.setItem(FLAG_KEY, JSON.stringify([...flagged]));
+  if (isPersistenceAllowed()) {
+    localStorage.setItem(scopedKey(FLAG_KEY), JSON.stringify([...flagged]));
+  }
   return nowFlagged;
 };
 
-export const clearFlags = () => localStorage.removeItem(FLAG_KEY);
+export const clearFlags = () => {
+  if (!isPersistenceAllowed()) return;
+  localStorage.removeItem(scopedKey(FLAG_KEY));
+};
 
 /* ------------------------------------------------------- derived pools -- */
 

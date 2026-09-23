@@ -10,7 +10,9 @@
 // its own reward.
 
 import { getAllQuestions, hashQuestion } from './quizData';
+import { isPersistenceAllowed, scopedKey } from './persistence';
 
+/** Namespaced per account by scopedKey — see persistence.js. */
 const STORAGE_KEY = 'daily_question';
 
 /** Local (not UTC) YYYY-MM-DD, so the question rolls over at the user's midnight. */
@@ -78,9 +80,13 @@ export const getDailyQuestion = (dateKey = getDateKey()) => {
 
 /* ------------------------------------------------------------ answers -- */
 
+// The one read point, so gating it covers the record, the streak and the
+// lifetime totals together. See persistence.js.
 const readRecords = () => {
+  if (!isPersistenceAllowed()) return {};
+
   try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    const stored = JSON.parse(localStorage.getItem(scopedKey(STORAGE_KEY)) || '{}');
     return stored && typeof stored === 'object' ? stored : {};
   } catch {
     return {};
@@ -89,7 +95,12 @@ const readRecords = () => {
 
 export const getDailyRecord = (dateKey = getDateKey()) => readRecords()[dateKey] || null;
 
+/** A no-op when signed out: the answer is still graded, just not remembered. */
 export const saveDailyAnswer = (dateKey, choiceIndex, correct) => {
+  if (!isPersistenceAllowed()) {
+    return { choice: choiceIndex, correct, at: new Date().toISOString() };
+  }
+
   const records = readRecords();
   records[dateKey] = { choice: choiceIndex, correct, at: new Date().toISOString() };
 
@@ -97,7 +108,7 @@ export const saveDailyAnswer = (dateKey, choiceIndex, correct) => {
   const keys = Object.keys(records).sort();
   while (keys.length > 400) delete records[keys.shift()];
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+  localStorage.setItem(scopedKey(STORAGE_KEY), JSON.stringify(records));
   return records[dateKey];
 };
 

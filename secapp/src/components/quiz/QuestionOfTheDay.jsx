@@ -11,6 +11,7 @@ import {
   msUntilTomorrow,
 } from '../data/dailyQuestion';
 import AnswerExplanation from './AnswerExplanation';
+import { useAuth } from '@/auth/AuthContext';
 
 /**
  * One question, the same for the whole day, with a day streak.
@@ -27,6 +28,10 @@ import AnswerExplanation from './AnswerExplanation';
  * because the live streak is owned by this component.
  */
 export default function QuestionOfTheDay({ hideTitle = false }) {
+  const { status } = useAuth();
+  // Streaks are only kept while signed in — see data/persistence.js.
+  const tracked = status === 'authenticated';
+
   const dateKey = getDateKey();
   const question = useMemo(() => getDailyQuestion(dateKey), [dateKey]);
 
@@ -141,9 +146,14 @@ export default function QuestionOfTheDay({ hideTitle = false }) {
 
         <div className="flex items-center justify-between gap-4 flex-wrap pt-1 border-t-2 border-slate-100 mt-1">
           <p className="text-xs text-slate-500 pt-3">
-            {totals.answered > 0
-              ? `${totals.correct} of ${totals.answered} daily questions correct`
-              : 'Answer to start your streak'}
+            {/* Signed out, totals stay 0 however many questions get answered,
+                so "answer to start your streak" would keep telling someone to
+                do the thing they just did. Say why instead. */}
+            {!tracked
+              ? 'Streaks are saved to your account — sign in to keep one'
+              : totals.answered > 0
+                ? `${totals.correct} of ${totals.answered} daily questions correct`
+                : 'Answer to start your streak'}
           </p>
           {answered && (
             <p className="text-xs text-slate-500 pt-3 inline-flex items-center gap-1.5">

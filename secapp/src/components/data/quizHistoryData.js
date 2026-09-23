@@ -5,8 +5,9 @@
 // two can never disagree about which domain is weakest.
 //
 // Every selector takes an optional `history` argument. Passing one in is how
-// the Progress page's sample-data toggle renders a populated dashboard
-// through the exact same code path as real results.
+// Home's ProgressPreview renders a populated teaser from a fixture through the
+// exact same code path as real results — and it is the seam the back end plugs
+// into in phase 3.
 //
 // Records are written by TakeQuiz.handleSubmit() and look like:
 //   { date, type, score, questionsCount, durationSeconds, domainTitle,
@@ -17,16 +18,22 @@
 
 import { getDomainByQuizLabel } from './securityDomains';
 import { getQuestionsByHash } from './quizData';
+import { isPersistenceAllowed, scopedKey } from './persistence';
 import { MOCK_PASS_MARK } from '@/lib/performanceStatus';
 
+/** Namespaced per account by scopedKey — see persistence.js. */
 const STORAGE_KEY = 'quiz_history';
 
 /** Keeps localStorage bounded — the array was previously unbounded. */
 export const MAX_HISTORY_ENTRIES = 50;
 
 export const getQuizHistory = () => {
+  // Signed out, there is no history to report. The key is not cleared — see
+  // persistence.js; this hides it, it does not destroy it.
+  if (!isPersistenceAllowed()) return [];
+
   try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const stored = JSON.parse(localStorage.getItem(scopedKey(STORAGE_KEY)) || '[]');
     if (!Array.isArray(stored)) return [];
     return [...stored].sort((a, b) => new Date(a.date) - new Date(b.date));
   } catch {
@@ -36,16 +43,26 @@ export const getQuizHistory = () => {
   }
 };
 
-/** Appends an attempt, trimming to the most recent MAX_HISTORY_ENTRIES. */
+/**
+ * Appends an attempt, trimming to the most recent MAX_HISTORY_ENTRIES.
+ *
+ * A no-op when signed out. The quiz still scores and still shows its results —
+ * the score lives in TakeQuiz's own state — it just leaves nothing behind.
+ */
 export const saveQuizAttempt = (attempt) => {
+  if (!isPersistenceAllowed()) return [];
+
   const history = getQuizHistory();
   history.push(attempt);
   const trimmed = history.slice(-MAX_HISTORY_ENTRIES);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+  localStorage.setItem(scopedKey(STORAGE_KEY), JSON.stringify(trimmed));
   return trimmed;
 };
 
-export const clearQuizHistory = () => localStorage.removeItem(STORAGE_KEY);
+export const clearQuizHistory = () => {
+  if (!isPersistenceAllowed()) return;
+  localStorage.removeItem(scopedKey(STORAGE_KEY));
+};
 
 /**
  * Questions answered and answered correctly in one attempt, from its

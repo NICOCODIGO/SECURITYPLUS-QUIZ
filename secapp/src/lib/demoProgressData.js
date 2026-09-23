@@ -1,27 +1,19 @@
-// Sample data used to show what a populated dashboard looks like.
+// Sample quiz history for Home's Progress teaser.
 //
-// Consumers:
-//  - ProgressPreview (Home) uses `demoProgressData` for the marketing teaser
-//    shown to visitors with no progress of their own.
-//  - The Progress page's "Sample data" toggle uses `demoQuizHistory` and
-//    `demoDailyStats`.
-//  - Home's hero art draws its trend chart from `demoQuizHistory`.
+// Sole consumer: ProgressPreview (secapp/src/components/previews/ProgressPreview.jsx),
+// which shows this — clearly labelled as sample — to visitors who don't yet have
+// two attempts of their own to plot, and switches to real results once
+// canDrawTrend is satisfied.
 //
-// Neither is ever written to localStorage — sample mode passes the fixture
-// straight into the quizHistoryData selectors, so what you see is rendered by
-// the same code that renders real results.
+// It is never written to localStorage. The fixture is passed straight into the
+// quizHistoryData selectors, so the picture on Home is rendered by exactly the
+// code that renders real results.
+//
+// The Progress page used to have a "Sample data" switch reading this too. It was
+// removed — see docs/decisions.md.
 
 import { quizQuestions, hashQuestion } from '../components/data/quizData';
 import { securityDomains } from '../components/data/securityDomains';
-
-// Placeholder numbers for the Home page dashboard teaser.
-export const demoProgressData = {
-  lessonsCompleted: 4,
-  totalLessons: 6,
-  averageQuizScore: 87,
-  timeSpent: '12h',
-  completionRate: 67,
-};
 
 // Per-domain accuracy the fixture should reproduce. Domain 4 is deliberately
 // the weak one — it matches the real gap in the question bank and gives the
@@ -52,10 +44,6 @@ const ATTEMPTS = [
   { daysAgo: 2, domain: 'domain3', count: 20, minutes: 14, improve: 0.07 },
   { daysAgo: 1, type: 'mock', count: 40, minutes: 41, improve: 0.08 },
 ];
-
-// Question of the Day lives in its own key, not in quiz_history, so sample
-// mode needs its own stand-in for the streak and lifetime totals.
-export const demoDailyStats = { streak: 6, answered: 18, correct: 14 };
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 

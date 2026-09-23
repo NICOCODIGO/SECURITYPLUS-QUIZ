@@ -11,6 +11,9 @@ import Progress from './pages/Progress';
 import AdminContentManager from './pages/AdminContentManager';
 import TakeQuiz from './pages/TakeQuiz';
 import DailyQuestion from './pages/DailyQuestion';
+import Login from './pages/Login';
+import SignUp from './pages/SignUp';
+import AuthProvider from './auth/AuthProvider';
 
 export default function App() {
   // Swap the bundled question bank for the API's copy once, on boot. Resolves
@@ -22,6 +25,8 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      {/* Inside the router: the provider's consumers navigate. */}
+      <AuthProvider>
       <Routes>
 
         {/* Home */}
@@ -105,16 +110,37 @@ export default function App() {
         />
 
         {/* Quiz route used by Start Quiz buttons: /TakeQuiz?… */}
-        <Route 
-          path="/TakeQuiz" 
+        <Route
+          path="/TakeQuiz"
           element={
             <Layout currentPageName="TakeQuiz">
               <TakeQuiz />
             </Layout>
-          } 
+          }
+        />
+
+        {/* Auth. Inside Layout, not full screen — full screen is for quizzes,
+            and a sign-in page with no nav has no way back. */}
+        <Route
+          path="/login"
+          element={
+            <Layout currentPageName="Login">
+              <Login />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/signup"
+          element={
+            <Layout currentPageName="SignUp">
+              <SignUp />
+            </Layout>
+          }
         />
 
       </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }
