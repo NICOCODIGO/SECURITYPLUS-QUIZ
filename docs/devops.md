@@ -12,9 +12,22 @@ Git carries the code. It deliberately does not carry installed tools or credenti
 | Node 22+, Java 25 | `npm run dev`, `./gradlew bootRun`, `./verify.sh` | optional if you only use `docker compose up` from the root |
 | `aws configure` | deploying | credentials live in `~/.aws`, never in the repo |
 
-After cloning, run `npm install` in `secapp/`. Don't copy `node_modules` between machines:
-some packages ship OS-specific binaries. Terraform state is in S3 (see
-[infra/README.md](../infra/README.md)), so there is no state file to carry over.
+After cloning, run `./scripts/doctor.sh`. It checks the tools above and installs the front-end
+packages. Don't copy `node_modules` between machines: some packages ship OS-specific binaries.
+Terraform state is in S3 (see [infra/README.md](../infra/README.md)), so there is no state file to
+carry over.
+
+### Switching machines
+
+- **Leaving:** commit, then **Sync Changes** in VS Code's Source Control panel (push and pull
+  in one click).
+- **Arriving:** **Sync Changes**, then `./scripts/doctor.sh` (Git Bash on Windows). It fails if
+  GitHub has commits you haven't pulled or Docker isn't running, and reinstalls front-end
+  packages when a pull changed `package-lock.json`.
+
+Not carried by git, on purpose: editor settings and extensions (VS Code's project settings
+folder is gitignored; turn on VS Code **Settings Sync** instead), and Claude Code's memory, which is per machine. Project
+knowledge lives in `CLAUDE.md` and `docs/` so it travels with the code.
 
 ## Three compose files — know which is which
 

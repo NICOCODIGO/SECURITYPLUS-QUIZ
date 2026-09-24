@@ -50,6 +50,7 @@ cd server
 ```bash
 ./verify.sh         # from the repo root: everything, with a PASS/FAIL/SKIP summary
 ./verify.sh --web   # front end only, no Docker required
+./scripts/doctor.sh # is this machine ready? run after switching machines
 ```
 
 ## Rules that hold everywhere
