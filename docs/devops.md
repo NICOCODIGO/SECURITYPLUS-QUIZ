@@ -2,6 +2,20 @@
 
 Containers, CI, environment, and the verification harness.
 
+## Setting up another machine
+
+Git carries the code. It deliberately does not carry installed tools or credentials:
+
+| Need | For | Notes |
+|---|---|---|
+| Git, Docker Desktop (**running**) | everything | Docker provides Postgres, DynamoDB Local, and Terraform for deploys |
+| Node 22+, Java 25 | `npm run dev`, `./gradlew bootRun`, `./verify.sh` | optional if you only use `docker compose up` from the root |
+| `aws configure` | deploying | credentials live in `~/.aws`, never in the repo |
+
+After cloning, run `npm install` in `secapp/`. Don't copy `node_modules` between machines:
+some packages ship OS-specific binaries. Terraform state is in S3 (see
+[infra/README.md](../infra/README.md)), so there is no state file to carry over.
+
 ## Three compose files — know which is which
 
 This is the most confusing thing in the repo, so it is first.
@@ -214,6 +228,10 @@ user out on each deploy.
 Front end to S3 + CloudFront. API as Docker → ECR → App Runner. RDS `t4g.micro` on the
 12-month free tier. Secrets in SSM Parameter Store. Terraform in `infra/`. CloudWatch logs plus
 a couple of alarms.
+
+Terraform state is in a private, encrypted, versioned S3 bucket that `scripts/deploy.sh` creates,
+so any machine with AWS credentials can deploy. `deploy.sh` runs Terraform through Docker when it
+isn't installed. Details in [infra/README.md](../infra/README.md).
 
 **One CloudFront distribution, two origins** — default to S3, `/api/*` to App Runner. Not a
 preference: the refresh cookie is `SameSite=Strict`, so an API on a separate domain would never

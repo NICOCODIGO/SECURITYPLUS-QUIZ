@@ -1,5 +1,6 @@
 terraform {
-  required_version = ">= 1.9"
+  # 1.10 for S3-native state locking (use_lockfile below).
+  required_version = ">= 1.10"
 
   required_providers {
     aws = {
@@ -12,10 +13,19 @@ terraform {
     }
   }
 
-  # State is local on purpose. A remote S3 backend is the right answer for a
-  # team, but it needs a bucket and a lock table that themselves have to be
-  # created first — and this stack has exactly one operator. If a second person
-  # ever applies this, move the state to S3 before they do, not after.
+  # State lives in S3 so every machine this is deployed from sees the same
+  # copy. It holds the RDS password and the JWT signing key in plaintext, so the
+  # bucket is private, encrypted and versioned — scripts/deploy.sh creates it
+  # that way. The bucket name carries the account id, which a backend block
+  # cannot compute, so deploy.sh passes it at init:
+  #   -backend-config=bucket=secplus-tfstate-<account-id>
+  # use_lockfile stops two machines applying at once without a DynamoDB table.
+  backend "s3" {
+    key          = "infra/terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    use_lockfile = true
+  }
 }
 
 provider "aws" {

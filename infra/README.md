@@ -45,12 +45,29 @@ talks to RDS and nothing else. Add one only when something actually needs egress
 
 ## State
 
-Local, and gitignored. It contains the generated RDS password and the JWT signing key **in
-plaintext** — committing it would publish both. `.terraform.lock.hcl` is committed on purpose;
-it pins provider versions.
+In S3, at `s3://secplus-tfstate-<account-id>/infra/terraform.tfstate`, so every machine this is
+deployed from shares one copy. It contains the generated RDS password and the JWT signing key **in
+plaintext**, so it must never be in git or copied around. The bucket is private,
+encrypted and versioned. `.terraform.lock.hcl` is committed on purpose; it pins provider versions.
 
-One operator, so a remote backend would mean creating a bucket and a lock table to protect state
-nobody else touches. If a second person ever applies this, move state to S3 *before* they do.
+`deploy.sh` creates the bucket (with the AWS CLI, not Terraform, so the bucket itself needs no
+state file) and passes its name at `init`, because a backend block cannot compute the account id.
+Locking is S3-native (`use_lockfile`, Terraform ≥ 1.10), so two machines cannot apply at once and
+no DynamoDB lock table is needed.
+
+**Migrating from local state.** If `infra/terraform.tfstate` exists when `deploy.sh` runs, it is
+copied to S3 once and renamed to `terraform.tfstate.migrated-backup`. Delete that backup after
+`plan` shows no changes. If S3 already holds state, the script refuses to overwrite it with a
+local copy, since that local copy is probably stale.
+
+To run Terraform by hand, initialise against the same bucket first:
+
+```bash
+terraform -chdir=infra init -backend-config="bucket=secplus-tfstate-$(aws sts get-caller-identity --query Account --output text)"
+```
+
+**Terraform does not have to be installed.** Without it, `deploy.sh` runs the pinned
+`hashicorp/terraform` image through Docker, so a new machine needs only Docker and `aws configure`.
 
 ## Teardown
 
