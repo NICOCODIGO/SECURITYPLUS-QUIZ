@@ -103,6 +103,29 @@ fi
 # creating the service points it at <repo>:latest and it fails outright if it
 # cannot pull. So the repository is targeted first, filled, and only then does
 # the rest of the stack come up. On later runs this is a no-op.
+# App Runner rejects any update while a rollout is in flight
+# (InvalidStateException: OPERATION_IN_PROGRESS), so a deploy started while the
+# previous one is still settling fails partway - after the image is pushed but
+# before the front end ships. Wait it out rather than half-deploying.
+wait_for_apprunner() {
+  local arn status waited=0
+  arn=$("$AWS" apprunner list-services --region "$REGION"     --query "ServiceSummaryList[?ServiceName=='secplus'].ServiceArn | [0]" --output text 2>/dev/null) || return 0
+  [ -z "$arn" ] || [ "$arn" = "None" ] && return 0
+
+  while [ "$waited" -lt 900 ]; do
+    status=$("$AWS" apprunner describe-service --service-arn "$arn" --region "$REGION"       --query 'Service.Status' --output text 2>/dev/null) || return 0
+    case "$status" in
+      OPERATION_IN_PROGRESS)
+        [ "$waited" -eq 0 ] && echo "App Runner is mid-rollout; waiting for it to settle..."
+        sleep 15; waited=$((waited + 15)) ;;
+      *) return 0 ;;
+    esac
+  done
+  echo "App Runner still busy after 15 minutes. Check its status before retrying." >&2
+  exit 1
+}
+wait_for_apprunner
+
 step "1/6  Creating the image repository"
 tf -chdir=infra apply -input=false -auto-approve -target=aws_ecr_repository.api
 ECR_URL=$(tf -chdir=infra output -raw ecr_repository_url)
@@ -117,7 +140,17 @@ docker build -t "$ECR_URL:latest" ./server
 docker push "$ECR_URL:latest"
 
 step "3/6  Provisioning the rest of the stack"
-tf -chdir=infra apply -input=false -auto-approve
+# Pass site_url through if a previous run already produced it. Without this,
+# this apply resets CORS_ALLOWED_ORIGINS to the placeholder and step 4 sets it
+# straight back - two App Runner config changes per deploy, each triggering its
+# own rollout, and the second racing the first into OPERATION_IN_PROGRESS.
+# Empty on the very first run, when the distribution does not exist yet.
+KNOWN_SITE_URL=$(tf -chdir=infra output -raw site_url 2>/dev/null || true)
+if [ -n "$KNOWN_SITE_URL" ]; then
+  tf -chdir=infra apply -input=false -auto-approve -var="site_url=$KNOWN_SITE_URL"
+else
+  tf -chdir=infra apply -input=false -auto-approve
+fi
 
 SITE_URL=$(tf -chdir=infra output -raw site_url)
 BUCKET=$(tf -chdir=infra output -raw site_bucket)
@@ -130,8 +163,13 @@ echo "bucket: $BUCKET"
 # ------------------------------------------------------------------ cors fix --
 
 step "4/6  Pointing the API's CORS origin at the real domain"
-# Cheap no-op on every run after the first.
-tf -chdir=infra apply -input=false -auto-approve -var="site_url=$SITE_URL"
+# Only the first run has anything to do here; later runs already passed the
+# real value at step 3.
+if [ "$SITE_URL" != "$KNOWN_SITE_URL" ]; then
+  tf -chdir=infra apply -input=false -auto-approve -var="site_url=$SITE_URL"
+else
+  echo "CORS origin already correct - nothing to change"
+fi
 
 # Pushing a new :latest changes no Terraform attribute, and auto-deploy is off,
 # so without this a redeploy would upload an image the service never picks up —
@@ -146,7 +184,15 @@ tf -chdir=infra apply -input=false -auto-approve -var="site_url=$SITE_URL"
 step "5/6  Building and uploading the front end"
 (
   cd secapp
-  npm ci
+  # `npm install`, not `npm ci`, and deliberately. `npm ci` deletes
+  # node_modules before reinstalling, which on Windows fails outright if
+  # anything holds a binary open - a running Vite dev server keeps
+  # esbuild.exe locked, and having one running while you deploy is entirely
+  # normal. It failed here once *after* the infrastructure had already been
+  # updated, leaving a half-deleted node_modules that broke local development
+  # too. `npm install` reconciles in place, so a locked file costs nothing.
+  # CI still uses `npm ci`, where the environment is clean and nothing is held.
+  npm install --no-audit --no-fund
   VITE_API_URL="$SITE_URL" npm run build
 )
 
