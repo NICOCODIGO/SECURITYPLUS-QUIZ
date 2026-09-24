@@ -96,7 +96,8 @@ answers, explanations, rationales).
 **Me** — `GET/POST /me/attempts`, `POST /me/import` (merge-on-signup),
 `GET/PUT /me/flags`, `GET/POST /me/daily`, `GET/POST/DELETE /me/presets`
 
-**Ops** — `/actuator/health`, `/actuator/metrics`, `/actuator/prometheus`, `/swagger-ui`
+**Ops** — `/actuator/health` (public), `/actuator/metrics`, `/actuator/prometheus`. No
+`/swagger-ui`: `springdoc` is not a dependency.
 
 ### The one contract that must not drift
 

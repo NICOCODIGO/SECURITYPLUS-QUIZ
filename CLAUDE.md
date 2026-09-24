@@ -9,8 +9,9 @@ on demand — read the one or two files your task needs rather than everything.
 
 Free study platform for the CompTIA Security+ SY0-701 exam. Front end: React 19 + Vite 7 +
 Tailwind 3 + shadcn/ui, plain **JSX, not TypeScript** (`secapp/`). Back end: Java 25 +
-Spring Boot 4.1 + PostgreSQL + DynamoDB (`server/`), **partly built — the question bank is
-served over a public read-only API; accounts and sync are not.**
+Spring Boot 4.1 + PostgreSQL (`server/`). **Deployed and live at
+https://d1cl3du8tc9284.cloudfront.net** — question bank and accounts are built; cross-device
+sync (phase 3) and resumable mock exams (phase 4, the only thing DynamoDB is for) are not.
 
 ## Read this first
 
@@ -77,8 +78,9 @@ Short list, kept here because missing one is expensive. Everything else is in `d
    touch `localStorage` directly.
 9. **Editing a question's wording** silently orphans its wrong-answer rationales and retires
    its history. See [docs/content.md](docs/content.md).
-10. **Verify, don't assume.** Run `./verify.sh`; for UI work, look at the page with the
-    `browser-automation` skill.
+10. **Verify, don't assume.** Run `./verify.sh`; for UI work, look at the rendered page. The
+    `frontend-ui` agent does this — note the `browser-automation` skill it mentions is not
+    installed everywhere, and it falls back to driving Playwright directly.
 
 ## Specialist agents
 

@@ -4,30 +4,39 @@ A free study platform for the **CompTIA Security+ (SY0-701)** exam: lessons, dom
 a full 90-question mock exam, a custom quiz builder, Question of the Day, and a progress
 dashboard.
 
-> **Status:** the front end is complete and usable. The back end is being built now — see
-> [Roadmap](#roadmap). The app works with the API switched off, so nothing here depends on a
-> server being up.
+**Live: https://d1cl3du8tc9284.cloudfront.net**
+
+> **Status:** deployed and working. React front end on S3 + CloudFront, Spring Boot API on App
+> Runner, PostgreSQL on RDS, accounts with rotating refresh tokens. Sync across devices is the
+> next piece — see [Roadmap](#roadmap). The app also runs with the API switched off, straight
+> from a clean checkout.
 
 ---
 
 ## Why it works the way it does
 
-**Everything is free without an account.** All 444 questions, every quiz mode, and the whole
-progress dashboard work anonymously, saving to browser storage. An account adds durability
-and comparison, not access:
+**Studying is free and needs no account.** All 444 questions, every quiz mode, the mock exam
+and Question of the Day work signed out, and always will.
 
-| | Anonymous | Account |
+**Recording your progress does need one.** Results are kept only while you are signed in. A
+quiz taken signed out is graded and reviewed in full — you see your score and every
+explanation — it just isn't saved, so there is no history to chart.
+
+| | Signed out | Account |
 |---|---|---|
 | Lessons, quizzes, mock exam, custom builder, Question of the Day | ✅ | ✅ |
-| Progress dashboard | ✅ browser storage, last 50 attempts | ✅ durable, unlimited |
-| Sync across devices · streak that survives a cache clear | — | ✅ |
-| Saved custom quizzes · synced flagged questions | — | ✅ |
-| Resume a mock exam you got interrupted in | — | ✅ |
+| Answers graded, score and explanations shown | ✅ | ✅ |
+| Results kept after you close the page | — | ✅ |
+| Progress dashboard, streak, weakest-subject drill | — | ✅ |
+| Sync across devices | — | planned |
+| Resume an interrupted mock exam | — | planned |
 
-Signing up **merges** your existing anonymous history rather than discarding it.
+With no API configured (`VITE_API_URL` unset) there is no account to have, so nothing is
+recorded at all — the app still runs every quiz from its bundled question bank. The reasoning
+is in [docs/decisions.md](docs/decisions.md).
 
 **There is no leaderboard and no comparison between users.** An account keeps your own study
-data safe and in sync — it never shows you how you rank against anyone, and your results are
+data safe — it never shows you how you rank against anyone, and your results are
 never visible to another user.
 
 **Mock exams run as a server-held session.** Not to police anything, but because a mock is 90
@@ -139,9 +148,19 @@ react-markdown. Plain JSX, not TypeScript.
 **Back end** — Java 25, Spring Boot 4.1, Spring Security, Spring Data JPA, Flyway,
 PostgreSQL, DynamoDB, Gradle. Tested with JUnit 5 and Testcontainers.
 
-**Deployment (planned)** — S3 + CloudFront for the front end; Docker → ECR → App Runner for
-the API; RDS Postgres; DynamoDB on-demand; secrets in SSM Parameter Store; Terraform;
-GitHub Actions.
+**Deployment** {D} live on AWS, defined in [`infra/`](infra/) with Terraform and shipped by
+`./scripts/deploy.sh`. React build on S3, API as a container in ECR running on App Runner,
+PostgreSQL on RDS in a private subnet, secrets in SSM Parameter Store, CI on GitHub Actions.
+
+The one design choice worth calling out: **the site and the API share a single CloudFront
+distribution**, with `/api/*` routed to App Runner and everything else to S3. That is not for
+tidiness. The refresh token is a `SameSite=Strict` cookie, so an API on its own domain would
+never receive it and every session would die fifteen minutes after sign-in {D} a failure local
+development cannot reproduce, because `localhost:5173` and `localhost:8080` count as the same
+site.
+
+There is no NAT gateway (the API makes no outbound calls) and no DynamoDB yet (nothing uses it
+until resumable mock exams land).
 
 ### Why Postgres *and* DynamoDB
 

@@ -8,11 +8,13 @@ A free study platform for the CompTIA Security+ **SY0-701** exam: lessons, domai
 a 90-question mock exam, a custom quiz builder, Question of the Day, and a progress
 dashboard.
 
-The front end is complete and in use. The back end **serves the question bank** over a public
-read-only API and **has accounts** — register, login, rotating refresh, logout, me. Sync and
-exam sessions are not built yet, so all study data is still browser storage for everyone,
-signed in or not. An account currently adds nothing but itself; that is deliberate, and why
-the merge-on-signup rule is not yet in play. See [decisions.md](decisions.md).
+**Live at https://d1cl3du8tc9284.cloudfront.net.** The front end is complete, the API serves
+the question bank and **has accounts** — register, login, rotating refresh, logout, me — and
+the whole stack is deployed on AWS.
+
+Study data is kept only while signed in, and still in that browser's local storage: an account
+gates recording, but does not yet carry results between devices. Cross-device sync is phase 3,
+and exam sessions phase 4. See [decisions.md](decisions.md).
 
 ## Tech stack
 
@@ -23,7 +25,7 @@ the merge-on-signup rule is not yet in play. See [decisions.md](decisions.md).
 | Relational | PostgreSQL 17 + Flyway | System of record |
 | Key-value | DynamoDB | In-progress exam sessions only |
 | Auth | Own bcrypt + JWT, rotating refresh | Not Cognito |
-| Deploy (planned) | S3 + CloudFront, ECR → App Runner, RDS | Free-tier first |
+| Deploy | S3 + CloudFront, ECR → App Runner, RDS, Terraform | Live; see `infra/` |
 | CI | GitHub Actions | `.github/workflows/ci.yml` |
 
 The AWS stack the original README planned — Lambda, API Gateway, Cognito, Amplify, MySQL —
@@ -35,7 +37,7 @@ was **abandoned**. So were TypeScript and React Query. See [decisions.md](decisi
 secapp/     React front end          → frontend.md, components.md, content.md
 server/     Spring Boot API          → backend.md, database.md
 docs/       these files
-infra/      Terraform (not yet)      → devops.md
+infra/      Terraform for AWS        → devops.md, infra/README.md
 verify.sh   the one verification command
 ```
 
@@ -58,15 +60,16 @@ nothing is recorded, so there is no history to chart. One predicate decides it �
 `secapp/src/components/data/persistence.js`. See [decisions.md](decisions.md) for the
 reasoning and what it costs.
 
-Two rules that follow from this, and that everything else is built around:
+Three rules that follow from this, and that everything else is built around:
 
-1. **Never put an existing feature behind the login.** An account adds durability, never
-   access.
-2. **Merge on signup is mandatory.** Creating an account uploads and merges existing local
-   history, streak and flags. Signing up must never cost someone their work.
-3. **Nothing comparative.** No leaderboard, ranking, percentiles or cross-user visibility —
-   rejected deliberately, and it set the shape of the whole back end. See
-   [decisions.md](decisions.md).
+1. **Never put a *studying* feature behind the login.** Every quiz and all 444 questions work
+   signed out and always must. Recording the results is the part that needs an account — a
+   deliberate narrowing of the original rule, see [decisions.md](decisions.md).
+2. **Nothing comparative.** No leaderboard, ranking, percentiles or cross-user visibility —
+   rejected deliberately, and it set the shape of the whole back end.
+3. **Storage is per account.** Keys are namespaced by user id, so two people sharing a browser
+   never see each other's history. Phase 3's `POST /me/import` is a merge the user asks for;
+   silently adopting whatever was already in the browser is not.
 
 ## Roadmap
 
@@ -74,7 +77,7 @@ Each phase ends with the app fully working, deployed or not.
 
 - **0 — Groundwork.** ✅ Done. `server/` scaffold, compose files, Flyway baseline, CI,
   rewritten READMEs.
-- **1 — Question service (read-only).** *In progress.*
+- **1 — Question service (read-only).** ✅ Done.
   - ✅ Importer (`scripts/generate-seed.mjs`) → `R__seed_content.sql`: 28 objectives, 444
     questions, 1,776 choices, 1,332 rationales, seeded and verified against real Postgres.
   - ✅ Server-side integrity tests (`ContentSeedTests`) — a bad tag now fails CI.
@@ -96,9 +99,12 @@ Each phase ends with the app fully working, deployed or not.
 - **4 — Resumable mock exams.** DynamoDB session lifecycle, keyless question delivery,
   blueprint-weighted draw, submit + review payload.
 - **5 — ~~Leaderboard~~. Cut.** See [decisions.md](decisions.md).
-- **6 — Deploy.** S3 + CloudFront; Docker → ECR → App Runner; RDS `t4g.micro`; DynamoDB
-  on-demand; secrets in SSM; Terraform in `infra/`; CloudWatch logs and alarms; structured
-  JSON logging with a request id.
+- **6 — Deploy.** ✅ Done. **Live at https://d1cl3du8tc9284.cloudfront.net.** Terraform in
+  `infra/`, shipped by `./scripts/deploy.sh`; S3 + CloudFront, ECR → App Runner, RDS
+  `t4g.micro` in a private subnet, secrets in SSM, state in S3. One distribution serves both
+  the site and `/api/*` — required, not tidy: the `SameSite=Strict` refresh cookie is never
+  sent to a different domain. No NAT gateway (no outbound calls) and no DynamoDB (unused until
+  phase 4). Request-id correlation on every log line; JSON logs in `prod`.
 - **7 — Content.** Admin authoring behind the `role` column, question drafts/review, then
   performance-based questions (drag-and-drop, hotspot).
 
