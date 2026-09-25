@@ -99,10 +99,6 @@ else
   tf -chdir=infra init -input=false -reconfigure -backend-config="bucket=$STATE_BUCKET"
 fi
 
-# The registry has to exist AND hold an image before App Runner is created:
-# creating the service points it at <repo>:latest and it fails outright if it
-# cannot pull. So the repository is targeted first, filled, and only then does
-# the rest of the stack come up. On later runs this is a no-op.
 # App Runner rejects any update while a rollout is in flight
 # (InvalidStateException: OPERATION_IN_PROGRESS), so a deploy started while the
 # previous one is still settling fails partway - after the image is pushed but
@@ -126,6 +122,10 @@ wait_for_apprunner() {
 }
 wait_for_apprunner
 
+# The registry has to exist AND hold an image before App Runner is created:
+# creating the service points it at <repo>:latest and it fails outright if it
+# cannot pull. So the repository is targeted first, filled, and only then does
+# the rest of the stack come up. On later runs this is a no-op.
 step "1/6  Creating the image repository"
 tf -chdir=infra apply -input=false -auto-approve -target=aws_ecr_repository.api
 ECR_URL=$(tf -chdir=infra output -raw ecr_repository_url)
@@ -206,7 +206,12 @@ step "5/6  Building and uploading the front end"
 step "6/6  Invalidating the CDN"
 "$AWS" cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*" >/dev/null
 
-printf '\n\033[32mDeployed:\033[0m %s\n' "$SITE_URL"
+# App Runner rolls out asynchronously, so the script finishing does NOT mean
+# the new image is serving. Waiting here matters more than it sounds: testing
+# straight after a deploy otherwise hits the *old* container, and the result
+# looks exactly like the change not working.
 echo
-echo "The API rolls out in the background — check with:"
-echo "  aws apprunner describe-service --service-arn $SERVICE_ARN --query 'Service.Status'"
+echo "Waiting for the API rollout to finish..."
+wait_for_apprunner
+
+printf '\n\033[32mDeployed and live:\033[0m %s\n' "$SITE_URL"
