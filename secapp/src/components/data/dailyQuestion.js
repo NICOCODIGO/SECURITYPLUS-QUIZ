@@ -11,6 +11,7 @@
 
 import { getAllQuestions, hashQuestion } from './quizData';
 import { isPersistenceAllowed, scopedKey } from './persistence';
+import { pushDaily } from './source';
 
 /** Namespaced per account by scopedKey — see persistence.js. */
 const STORAGE_KEY = 'daily_question';
@@ -109,6 +110,7 @@ export const saveDailyAnswer = (dateKey, choiceIndex, correct) => {
   while (keys.length > 400) delete records[keys.shift()];
 
   localStorage.setItem(scopedKey(STORAGE_KEY), JSON.stringify(records));
+  pushDaily(dateKey, correct, records[dateKey].at);
   return records[dateKey];
 };
 

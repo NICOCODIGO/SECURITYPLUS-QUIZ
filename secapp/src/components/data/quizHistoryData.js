@@ -19,6 +19,7 @@
 import { getDomainByQuizLabel } from './securityDomains';
 import { getQuestionsByHash } from './quizData';
 import { isPersistenceAllowed, scopedKey } from './persistence';
+import { pushAttempt } from './source';
 import { MOCK_PASS_MARK } from '@/lib/performanceStatus';
 
 /** Namespaced per account by scopedKey — see persistence.js. */
@@ -56,6 +57,11 @@ export const saveQuizAttempt = (attempt) => {
   history.push(attempt);
   const trimmed = history.slice(-MAX_HISTORY_ENTRIES);
   localStorage.setItem(scopedKey(STORAGE_KEY), JSON.stringify(trimmed));
+
+  // Local first so the results screen is instant and works offline, then up.
+  // The local cap of 50 does not apply to the server, which keeps everything —
+  // so an older attempt trimmed from here is still there on the next sign-in.
+  pushAttempt(attempt);
   return trimmed;
 };
 

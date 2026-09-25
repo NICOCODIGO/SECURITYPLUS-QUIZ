@@ -7,6 +7,7 @@ import {
   setUnauthenticatedHandler,
   setUserId,
 } from '@/api/authSession';
+import { hydrate as hydrateStudyData } from '@/components/data/source';
 import * as authApi from './authApi';
 import { AuthContext } from './AuthContext';
 
@@ -41,8 +42,15 @@ export default function AuthProvider({ children }) {
         // storage already sees persistence allowed and knows whose it is.
         setUserId(session.user.id);
         setSessionActive(true);
-        setUser(session.user);
-        setStatus('authenticated');
+        // And the server's copy before that, so the first signed-in render
+        // already has real data. Hydrating afterwards paints an empty
+        // dashboard for a beat, which reads as data loss. Never throws: a
+        // failed pull leaves whatever is local in place.
+        hydrateStudyData().finally(() => {
+          if (cancelled) return;
+          setUser(session.user);
+          setStatus('authenticated');
+        });
       })
       .catch(() => {
         // No cookie, an expired one, or no server. All mean "signed out" —
@@ -69,10 +77,14 @@ export default function AuthProvider({ children }) {
     return () => setUnauthenticatedHandler(null);
   }, []);
 
-  const adopt = useCallback((session) => {
+  const adopt = useCallback(async (session) => {
     setAccessToken(session.accessToken);
     setUserId(session.user.id);
     setSessionActive(true);
+    // Pull this account's history before anything renders as signed in, so
+    // somebody signing in on a second device sees their results rather than an
+    // empty dashboard that fills in a moment later. Never throws.
+    await hydrateStudyData();
     setUser(session.user);
     setStatus('authenticated');
     return session;

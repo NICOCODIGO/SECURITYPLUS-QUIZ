@@ -130,10 +130,16 @@ Two things to hold onto:
 `TakeQuiz` appends an attempt on submit. Each record:
 
 ```js
-{ date, type, score, questionsCount, durationSeconds, domainTitle,
+{ id, date, type, score, questionsCount, durationSeconds, domainTitle,
   domainBreakdown: [{ domain, percentage, correct, total }],
-  answers: [{ id, ok }] }          // id = hashQuestion(question.question)
+  answers: [{ id, ok }] }          // answers[].id = hashQuestion(question.question)
 ```
+
+The record `id` is a `crypto.randomUUID()` minted by `TakeQuiz`, and it is the **entire**
+dedupe strategy for sync: `POST /me/attempts` is `on conflict (id) do nothing`, so re-sending
+an attempt after a flaky request stores nothing rather than duplicating the quiz. Records
+written before this existed have no `id`; `source.js` assigns one at first sync and persists
+it back.
 
 Progress and the Practice dashboard are both **pure selectors over this array** —
 `getQuizStats`, `getModeStats`, `getDomainPerformance`, `getScoreTrend`, `getMostMissed`,
@@ -141,9 +147,9 @@ Progress and the Practice dashboard are both **pure selectors over this array** 
 Home's `ProgressPreview` renders a populated teaser from a fixture through the exact same
 code path as real results.
 
-**That argument is also the seam the back end plugs into.** Phase 3 returns attempts from
-`GET /me/attempts` in exactly this record shape, so the selectors work unchanged and no
-analytics logic is duplicated server-side. Don't reimplement these on the server.
+**That argument is also the seam the back end plugs into.** `GET /me/attempts` returns records
+in exactly this shape, so every selector works unchanged and no analytics logic is duplicated
+server-side. Don't reimplement these on the server.
 
 Rules that live in these selectors:
 
@@ -203,11 +209,38 @@ Consequences worth knowing:
   asking what they ask today. Switching to the objective's domain is a product decision, not
   a side effect of moving to the API.
 
-Phase 3 adds an `AuthContext` and `source.js` for *user data* on the same pattern. The accessor modules above keep their exported signatures and read through
-whichever source is active.
+## Syncing study data: `source.js`
+
+`secapp/src/components/data/source.js` is how an account's history reaches a second device. It
+follows the same shape as `questionBank.js`: **pull once, write into the store the accessors
+already read, and leave every read synchronous.**
+
+That last part is the constraint everything else bends around. `Progress.jsx` reads the
+accessors inside `useMemo` and some derivations run at import time, so turning them async to
+fetch per-call would ripple through every caller. Instead `hydrate()` fetches
+`/me/attempts`, `/me/flags` and `/me/daily` once and writes them into the namespaced local
+keys; nothing downstream changes at all.
+
+Three things about it are deliberate:
+
+- **It merges, it does not overwrite.** The server holds everything recorded from any device,
+  but this browser may hold attempts the server has never seen — history written before sync
+  existed. Replacing local with remote would delete exactly those, silently. Local-only
+  attempts get an id if they lack one, are pushed up, and are kept.
+- **It runs before the UI believes it is signed in.** `AuthProvider` awaits it before
+  `setStatus('authenticated')`, in both the boot-refresh and the sign-in path, so the first
+  signed-in render already has real data. Hydrating afterwards paints an empty dashboard for a
+  beat, which reads as data loss.
+- **It never blocks sign-in.** A failed pull leaves whatever is local in place and the app
+  carries on — the same judgement `questionBank.js` makes when the API is unreachable.
+
+Writes go local first (instant, works offline) and then up. A failed `POST /me/attempts` is
+queued under its own namespaced key and flushed on the next hydrate, *before* the fetch, so a
+quiz taken offline is never lost. The server dedupes on the attempt's client-minted id, so
+re-sending one that did land after all is a no-op rather than a duplicate.
 
 **Fallback is a hard requirement.** If `VITE_API_URL` is unset or a request fails, everything
-falls back to `LocalSource` and the bundled question bank. `npm run dev` on a clean checkout
+falls back to browser storage and the bundled question bank. `npm run dev` on a clean checkout
 must give a fully working app with no Docker, no database and no account.
 
 ## The lesson-reading flow is disconnected

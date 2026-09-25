@@ -9,6 +9,7 @@
 import { getAllQuestions, hashQuestion } from './quizData';
 import { getQuizHistory } from './quizHistoryData';
 import { isPersistenceAllowed, scopedKey } from './persistence';
+import { pushFlags } from './source';
 
 /** Namespaced per account by scopedKey — see persistence.js. */
 const FLAG_KEY = 'flagged_questions';
@@ -44,6 +45,8 @@ export const toggleFlag = (questionId) => {
 
   if (isPersistenceAllowed()) {
     localStorage.setItem(scopedKey(FLAG_KEY), JSON.stringify([...flagged]));
+    // The whole set, because that is what PUT /me/flags replaces.
+    pushFlags([...flagged]);
   }
   return nowFlagged;
 };

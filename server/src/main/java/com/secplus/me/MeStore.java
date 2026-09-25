@@ -18,6 +18,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 import com.secplus.me.MeViews.AnswerView;
+import com.secplus.me.MeViews.AttemptUpload;
 import com.secplus.me.MeViews.AttemptView;
 import com.secplus.me.MeViews.DailyView;
 import com.secplus.me.MeViews.DomainSlice;
@@ -145,7 +146,7 @@ public class MeStore {
 	 * is the whole dedupe strategy: no natural key, no timestamp matching.
 	 * Returns true when a row was actually written.
 	 */
-	public boolean saveAttempt(UUID userId, AttemptView attempt) {
+	public boolean saveAttempt(UUID userId, AttemptUpload attempt) {
 		int inserted = db.sql("""
 				insert into attempts (id, user_id, type, score, questions_count,
 				                      duration_seconds, domain_title, server_graded, submitted_at)

@@ -176,4 +176,8 @@ export function postJson(path, body = null, options = {}) {
   return request('POST', path, { ...options, body });
 }
 
+export function putJson(path, body = null, options = {}) {
+  return request('PUT', path, { ...options, body });
+}
+
 export { refreshSession };

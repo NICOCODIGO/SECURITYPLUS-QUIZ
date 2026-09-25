@@ -158,6 +158,10 @@ export default function TakeQuiz() {
     // keep the record small) and how long the attempt took, not just the
     // headline score.
     saveQuizAttempt({
+      // Minted here, not by the server. It is the whole dedupe strategy:
+      // POST /me/attempts is `on conflict (id) do nothing`, so a retry after a
+      // flaky request stores nothing rather than duplicating the quiz.
+      id: crypto.randomUUID(),
       date: new Date().toISOString(),
       type: quizType || 'domain',
       score: calculateScore(),

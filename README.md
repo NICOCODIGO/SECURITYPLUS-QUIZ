@@ -7,9 +7,10 @@ dashboard.
 **Live: https://d1cl3du8tc9284.cloudfront.net**
 
 > **Status:** deployed and working. React front end on S3 + CloudFront, Spring Boot API on App
-> Runner, PostgreSQL on RDS, accounts with rotating refresh tokens. Sync across devices is the
-> next piece — see [Roadmap](#roadmap). The app also runs with the API switched off, straight
-> from a clean checkout.
+> Runner, PostgreSQL on RDS, accounts with rotating refresh tokens, and quiz history that
+> follows your account between devices. Resumable mock exams are the next piece — see
+> [Roadmap](#roadmap). The app also runs with the API switched off, straight from a clean
+> checkout.
 
 ---
 
@@ -28,7 +29,7 @@ explanation — it just isn't saved, so there is no history to chart.
 | Answers graded, score and explanations shown | ✅ | ✅ |
 | Results kept after you close the page | — | ✅ |
 | Progress dashboard, streak, weakest-subject drill | — | ✅ |
-| Sync across devices | — | planned |
+| Sync across devices | — | ✅ |
 | Resume an interrupted mock exam | — | planned |
 
 With no API configured (`VITE_API_URL` unset) there is no account to have, so nothing is

@@ -62,12 +62,25 @@ class MeApiTests {
 		return JsonPath.read(result.getResponse().getContentAsString(), "$[0].legacyHash");
 	}
 
+	/**
+	 * Exactly what the browser sends, including the `domainBreakdown` it keeps
+	 * locally.
+	 *
+	 * That field is the reason this helper is worth reading. An earlier version
+	 * sent `"domainBreakdown":[]`, which binds cleanly and made every test pass
+	 * while **every real submission returned 400** — the browser's breakdown is
+	 * keyed by a domain *label*, and the response record expects a *number*, so
+	 * a populated array could not be deserialised at all. The upload record now
+	 * omits the field entirely; sending it anyway must be harmless.
+	 */
 	private String attemptJson(UUID id, String hash, boolean ok) {
 		return """
 				{"id":"%s","date":"2026-09-23T12:00:00Z","type":"domain","score":%d,
 				 "questionsCount":1,"durationSeconds":42,"domainTitle":"1.0 General Security Concepts",
-				 "domainBreakdown":[],"answers":[{"id":"%s","ok":%b}]}"""
-			.formatted(id, ok ? 100 : 0, hash, ok);
+				 "domainBreakdown":[{"domain":"Domain 1: General Security Concepts",
+				                     "percentage":%d,"correct":%d,"total":1}],
+				 "answers":[{"id":"%s","ok":%b}]}"""
+			.formatted(id, ok ? 100 : 0, ok ? 100 : 0, ok ? 1 : 0, hash, ok);
 	}
 
 	private void postAttempt(String token, String body) throws Exception {

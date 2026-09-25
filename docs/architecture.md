@@ -12,9 +12,9 @@ dashboard.
 the question bank and **has accounts** — register, login, rotating refresh, logout, me — and
 the whole stack is deployed on AWS.
 
-Study data is kept only while signed in, and still in that browser's local storage: an account
-gates recording, but does not yet carry results between devices. Cross-device sync is phase 3,
-and exam sessions phase 4. See [decisions.md](decisions.md).
+Study data is kept only while signed in, and **follows the account between devices**: signing
+in anywhere pulls your history down and merges it with whatever that browser already had.
+Resumable exam sessions are phase 4. See [decisions.md](decisions.md).
 
 ## Tech stack
 
@@ -52,7 +52,7 @@ anonymously. **Progress reporting does not** — results are only kept while sig
 | Answers graded, score and explanations shown | ✅ | ✅ |
 | Results kept after the page closes | — | ✅ |
 | Progress dashboard · streak · weakest-subject drill | — | ✅ |
-| Cross-device sync | — | Phase 3 |
+| Cross-device sync | — | ✅ |
 | Resume an interrupted mock exam | — | Phase 4 |
 
 That second row is the deliberate narrowing: you can study as much as you like signed out, but
@@ -93,9 +93,12 @@ Each phase ends with the app fully working, deployed or not.
   email. Register returns 409 on a duplicate — a documented narrowing, see
   [decisions.md](decisions.md). 52 tests. No new migration: `V1__init.sql` already had
   `users` and `refresh_tokens`.
-- **3 — Sync + merge-on-signup.** `/me/attempts`, `/me/flags`, `/me/daily`, `/me/presets`,
-  the `RemoteSource`, and `POST /me/import` merging by `(legacy_hash, submitted_at)` so a
-  double import can't duplicate.
+- **3 — Sync.** ✅ Done. `/me/attempts`, `/me/flags`, `/me/daily`, and
+  `secapp/src/components/data/source.js` on the client. Dedupe is a **client-minted attempt
+  id**, not `(legacy_hash, submitted_at)` — that key never existed on `attempts`, and a uuid
+  the browser generates makes `on conflict do nothing` idempotent with no guessing. No
+  `POST /me/import`: recording is gated on an account, so there is no anonymous history to
+  merge. No `/me/presets`: nothing in the browser writes one.
 - **4 — Resumable mock exams.** DynamoDB session lifecycle, keyless question delivery,
   blueprint-weighted draw, submit + review payload.
 - **5 — ~~Leaderboard~~. Cut.** See [decisions.md](decisions.md).

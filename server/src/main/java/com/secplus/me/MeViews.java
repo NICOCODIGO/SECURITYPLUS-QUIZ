@@ -48,6 +48,24 @@ public final class MeViews {
 			List<AnswerView> answers) {
 	}
 
+	/**
+	 * What the browser sends up, which is **not** what it gets back.
+	 *
+	 * No `domainBreakdown`: the server derives that from `attempt_answers` and
+	 * ignores anything supplied, so accepting it invites exactly the bug this
+	 * record exists to prevent. The browser's own breakdown is keyed by a domain
+	 * *label* while DomainSlice is keyed by a *number*, so binding it into the
+	 * response record failed outright and every real quiz submission 400'd —
+	 * while a test sending an empty array passed.
+	 *
+	 * A separate record rather than a nullable field on AttemptView, for the
+	 * reason QuestionViews gives: the split should be impossible to get wrong by
+	 * accident, not merely documented.
+	 */
+	public record AttemptUpload(UUID id, String date, String type, int score, int questionsCount,
+			Integer durationSeconds, String domainTitle, List<AnswerView> answers) {
+	}
+
 	/** One Question-of-the-Day answer, keyed by the local date it was shown. */
 	public record DailyView(String date, boolean correct, String at) {
 	}

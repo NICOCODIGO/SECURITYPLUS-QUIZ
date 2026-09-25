@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.secplus.me.MeViews.AttemptUpload;
 import com.secplus.me.MeViews.AttemptView;
 import com.secplus.me.MeViews.DailyView;
 
@@ -70,7 +71,7 @@ public class MeController {
 	@PostMapping("/attempts")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@Transactional
-	void saveAttempt(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody AttemptView attempt) {
+	void saveAttempt(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody AttemptUpload attempt) {
 		store.saveAttempt(caller(jwt), attempt);
 	}
 

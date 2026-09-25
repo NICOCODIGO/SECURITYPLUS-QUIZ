@@ -93,8 +93,18 @@ sets it inside `apiClient` rather than at any call site.
 grades, writes the attempt to Postgres, and returns the full review payload (correct
 answers, explanations, rationales).
 
-**Me** — `GET/POST /me/attempts`, `POST /me/import` (merge-on-signup),
-`GET/PUT /me/flags`, `GET/POST /me/daily`, `GET/POST/DELETE /me/presets`
+**Me — ✅ built.** `GET/POST /me/attempts`, `GET/PUT /me/flags`, `GET/POST /me/daily`. All
+authenticated, all filtered on the `sub` claim — which is the only ownership check there is,
+so every statement in `MeStore` carries a `where user_id`.
+
+`POST /me/attempts` is idempotent on a **client-minted** attempt id (`on conflict do nothing`)
+and always returns 204, because the browser re-sends whatever it is unsure about and a 409
+would turn a successful retry into an error it has to special-case.
+
+There is no `POST /me/import`: with recording gated on an account there is no anonymous history
+to merge. The browser instead sends up any attempt the server does not already have when it
+hydrates. And no `/me/presets` — `CustomQuizBuilder` holds its configuration in `useState` and
+never persists it, so that table maps to a key nothing writes.
 
 **Ops** — `/actuator/health` (public), `/actuator/metrics`, `/actuator/prometheus`. No
 `/swagger-ui`: `springdoc` is not a dependency.
