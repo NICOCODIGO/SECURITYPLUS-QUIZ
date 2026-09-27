@@ -289,7 +289,8 @@ public class AuthController {
 				String[] entries = forwarded.split(",");
 				int index = Math.max(entries.length - properties.getForwardedForHops(), 0);
 				String chosen = entries[index].trim();
-				// Off unless LOGGING_LEVEL_COM_SECPLUS_AUTH_AUTHCONTROLLER=DEBUG. The
+				// Off unless LOGGING_LEVEL_COM_SECPLUS_AUTH=DEBUG (package level:
+				// Boot lowercases logging env vars, so a class name never matches). The
 				// way to set forwarded-for-hops after the proxies in front change:
 				// compare `chosen` with the caller's real public IP. Logs addresses,
 				// so switch it back off afterwards.

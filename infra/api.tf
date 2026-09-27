@@ -125,7 +125,11 @@ resource "aws_apprunner_service" "api" {
           # each X-Forwarded-For and the entry chosen (AuthController.clientIp),
           # so the hops value above can be read off rather than guessed. Logs
           # IP addresses - remove once the value is confirmed.
-          LOGGING_LEVEL_COM_SECPLUS_AUTH_AUTHCONTROLLER = "DEBUG"
+          #
+          # Package level, not the class: Boot lowercases logging env vars, so
+          # ..._AUTHCONTROLLER names a logger `authcontroller` that matches
+          # nothing. That clientIp line is the package's only debug output.
+          LOGGING_LEVEL_COM_SECPLUS_AUTH = "DEBUG"
 
           AUTH_COOKIE_SECURE = "true"
           # Holds only because /api/* is served from the site's own domain.

@@ -107,7 +107,11 @@ resource "aws_amplify_app" "web" {
   # Nested under `applications` with the appRoot, because this is a monorepo
   # app: the flat top-level `customHeaders` form fails every build at the
   # deploy step ("Monorepo spec provided without applications key").
-  custom_headers = yamlencode({
+  #
+  # jsonencode, not yamlencode: Amplify accepts YAML but stores it back as
+  # compact JSON with sorted keys, so YAML shows as a change on every plan.
+  # JSON is valid YAML, and jsonencode produces exactly what Amplify returns.
+  custom_headers = jsonencode({
     applications = [{
       appRoot = "secapp"
       customHeaders = [{
