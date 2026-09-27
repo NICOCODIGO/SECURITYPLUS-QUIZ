@@ -46,7 +46,7 @@ export default function DailyQuestionCard({ lead = false }) {
   const status = answered
     ? `${record.correct ? 'Answered correctly' : 'Answered — missed it'} · new question in ${hoursLeft}h`
     : lead
-    ? 'One question, about a minute. ort quiz on any domain below.'
+    ? 'One question, about a minute. Then try a short quiz on any domain below.'
     : 'One question, about a minute.';
 
   return (
