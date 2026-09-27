@@ -59,13 +59,15 @@ cd server
 Short list, kept here because missing one is expensive. Everything else is in `docs/`.
 
 1. **Nothing comparative.** No leaderboard, ranking, percentiles, or cross-user visibility.
-2. **Studying is never behind the login; recording it is.** Every quiz, the mock exam and all
-   444 questions work signed out and always must. But study data is kept **only while signed
-   in** — one predicate, `secapp/src/components/data/persistence.js`. Don't gate a *studying*
-   feature, and don't scatter that check.
+2. **Studying is never behind the login; recording it is.** The domain quizzes, the mock exam
+   and all 444 questions work signed out and always must. Study data is kept **only while
+   signed in** — one predicate, `secapp/src/components/data/persistence.js`. The modes built
+   *on* that data — Weakest Subject, Build Your Own, Question of the Day — need an account;
+   the list is `secapp/src/components/quiz/accountOnly.js`. Don't gate anything else, and
+   don't scatter either check.
 3. **The app must work with the API off.** `VITE_API_URL` unset falls back to the bundled
-   question bank and every quiz still runs. Note it no longer falls back to browser storage
-   for results: no API means no account, so nothing is recorded. See
+   question bank and every domain quiz and the mock exam still run. Note it no longer falls
+   back to browser storage for results: no API means no account, so nothing is recorded. See
    [docs/decisions.md](docs/decisions.md).
 4. **Grids need `grid-cols-1`.** A `grid` with only `lg:grid-cols-*` overflows narrow
    screens.

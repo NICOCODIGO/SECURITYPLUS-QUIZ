@@ -12,10 +12,15 @@
 //  1. It narrows CLAUDE.md rule 2. Progress *reporting* now needs an account,
 //     where before it worked anonymously against browser storage.
 //  2. With VITE_API_URL unset there is no API, therefore no account, therefore
-//     no persistence at all. A clean checkout still runs every quiz, the
-//     question bank, and Question of the Day — but the Progress dashboard,
-//     the streak and the weakest-subject drill stay empty, because there is
-//     nothing for them to read. `docs/decisions.md` records this.
+//     no persistence at all. A clean checkout still runs the domain quizzes,
+//     the mock exam and the question bank — but the Progress dashboard stays
+//     empty, because there is nothing for it to read. `docs/decisions.md`
+//     records this.
+//
+// The modes built on this data (Weakest Subject, Build Your Own, Question of
+// the Day) aren't offered while signed out. That check lives in
+// components/quiz/accountOnly.js, not here: this file decides what is kept,
+// that one decides what is offered.
 //
 // Nothing here deletes anything. A signed-out browser stops reading its old
 // `quiz_history`, but the key is left alone: the policy is reversible and

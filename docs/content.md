@@ -128,7 +128,8 @@ looked random but repeated questions inside a fortnight, which is very noticeabl
 something labelled "of the day".
 
 Only the answer and the streak are persisted, and **not** into `quiz_history` — a
-one-question 0%/100% would swing the averages.
+one-question 0%/100% would swing the averages. It is account-only: signed out it isn't
+offered at all (see `secapp/src/components/quiz/accountOnly.js`).
 
 ## Mock exam draw
 

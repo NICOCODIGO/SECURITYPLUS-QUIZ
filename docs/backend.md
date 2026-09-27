@@ -194,8 +194,9 @@ friction that buys nothing.
 
 **Verification gates password reset and nothing else.** An unverified address gets no reset
 link — otherwise registering someone else's address would be a way to take over a mailbox you
-never proved you owned. It must never gate *studying*: every quiz works signed out, so gating
-it signed in would be a strict downgrade for having made an account.
+never proved you owned. It must never gate *studying*: the domain quizzes and mock exam work
+signed out, so gating anything signed in would be a strict downgrade for having made an
+account.
 
 ## Auth design
 

@@ -25,3 +25,10 @@ export const useAuth = () => useContext(AuthContext);
 
 /** True only where an account exists and is signed in. */
 export const isSignedIn = (status) => status === 'authenticated';
+
+/**
+ * True once it is settled that nobody is signed in — anonymous, or no API at
+ * all. Not while `loading`: an account-only feature must not flash a sign-up
+ * prompt at someone who turns out to be signed in.
+ */
+export const isSignedOut = (status) => status === 'anonymous' || status === 'unavailable';

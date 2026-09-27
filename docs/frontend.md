@@ -55,7 +55,8 @@ routing at the same time.
 
 `/daily` is the one other full-screen page and is plain react-router, no `sessionStorage`
 handoff, because the card reads the day's question itself and writes only to
-`daily_question`.
+`daily_question`. It is account-only: signed out it renders `AccountRequired`, and while
+auth is `loading` a placeholder, so neither the question nor the lock flashes.
 
 `TakeQuiz` is built to fit one laptop screen without scrolling: a single top bar (exit,
 title, timer, flag), Previous/Next inside the question card's footer, and — from `lg` — the
@@ -80,12 +81,27 @@ or a shared link still lands on the right section.
 **A `<Link>` to `/lessons?section=…` from *inside* the page won't switch sections — call
 `changeSection` instead.**
 
+**`weakest`, `custom` and Question of the Day are account-only.**
+`secapp/src/components/quiz/accountOnly.js` is the list. `isSectionLocked(mode, status)` is
+the check for the two locked modes — the Overview's cards, `QuizSidebar`'s lock icons and
+`Lessons`' section switch all ask it. Signed out (or with no API), the card turns into a
+greyed `LockedModeCard` and the section renders `AccountRequired` in place of the mode; the
+sign-up and sign-in links carry `?next=` back to the mode. They stay unlocked while auth is
+`loading`, so a signed-in visitor never sees the lock flash. Question of the Day is
+*hidden* instead (`showsDailyQuestion`), so it only appears once signed in — the Progress
+page's signed-out card is where it is advertised.
+
 The `dashboard` section (`secapp/src/components/quiz/Dashboard.jsx`) is the overview: one recommended next step
-chosen from the visitor's state (brand new, weak domain, no mock yet, keeping sharp), then
-the domains as a compact list, then the exam and targeted modes. It reads storage once on
-mount, which is safe because finishing a quiz always reloads this page. Keep first-open in
-mind when editing it — a new visitor should see what each mode involves, not a grid of
-zeros.
+chosen from the visitor's history (weak domain, no mock yet, keeping sharp), then
+the domains as a compact list, then the exam and targeted modes. `DailyQuestionCard` is the
+page's only entry to Question of the Day: when today's question *is* the recommendation
+(signed in, no quizzes yet, not answered today) there is no separate next-step card and it
+takes the lead styling instead — don't add it back as a `pickNextStep` branch, that showed it
+twice. With no history there is no recommendation at all — signed out, the page opens on the
+domain list (the old "Take your first quiz" card is in decisions.md). Its reads are keyed on
+`signedIn`, not `[]`: auth resolves after mount, and a read taken before it lands is empty
+and never retried. Keep first-open in mind when editing it — a new visitor should see what
+each mode involves, not a grid of zeros.
 
 ## Browser storage
 
@@ -121,8 +137,9 @@ Two things to hold onto:
 - **Nothing is ever deleted.** A signed-out browser stops *reading* its old `quiz_history`;
   the key is left alone. The policy is one line and reversing it restores the data.
 - **With `VITE_API_URL` unset there is no account**, so nothing persists at all. This narrows
-  the fallback rule below: a clean checkout still runs every quiz and the whole bank, but
-  keeps no results. `ProgressGate` says so on the page rather than showing an empty dashboard.
+  the fallback rule below: a clean checkout still runs the domain quizzes, the mock exam and
+  the whole bank, but keeps no results; Weakest Subject and Build Your Own stay locked and
+  Question of the Day hidden. `ProgressGate` says so on the page rather than showing an empty dashboard.
   Recorded in [decisions.md](decisions.md).
 
 ### `quiz_history` and the selector pattern
@@ -171,8 +188,8 @@ Score thresholds live in `secapp/src/lib/performanceStatus.js` — `MOCK_PASS_MA
 ### Why `daily_question` is separate
 
 A single question scores 0% or 100%, which would swing the weighted averages. It is shown
-separately: in the Practice page's daily strip (a link to `/daily`) and in Progress's
-`PracticeMixPanel`.
+separately: in the Practice page's `DailyQuestionCard` (a link to `/daily`) and in
+Progress's `PracticeMixPanel`.
 
 ### Sample data
 

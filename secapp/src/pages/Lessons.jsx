@@ -6,6 +6,9 @@ import DomainQuiz from '../components/quiz/DomainQuiz';
 import MockExam from '../components/quiz/MockExam';
 import WeakestSubjectQuiz from '../components/quiz/WeakestSubjectQuiz';
 import CustomQuizBuilder from '../components/quiz/CustomQuizBuilder';
+import AccountRequired from '../components/quiz/AccountRequired';
+import { isSectionLocked } from '../components/quiz/accountOnly';
+import { useAuth, isSignedIn } from '@/auth/AuthContext';
 import { quizQuestions, getAllQuestions } from '../components/data/quizData';
 import { getDomainById } from '../components/data/securityDomains';
 import { getQuizHistory, getDomainPerformance } from '../components/data/quizHistoryData';
@@ -21,19 +24,26 @@ import { getQuizHistory, getDomainPerformance } from '../components/data/quizHis
  * Your numbers live on the Progress page rather than in it.
  *
  * Question of the Day is not a section here — it has its own full screen at
- * /daily, reached from the dashboard's strip.
+ * /daily, reached from the dashboard's card (signed in only).
+ *
+ * Weakest Subject and Build Your Own need an account (see accountOnly.js);
+ * signed out, their sections explain that instead of rendering the mode.
  */
 export default function Lessons() {
   const navigate = useNavigate();
+  const { status } = useAuth();
   const [selectedSection, setSelectedSection] = useState(() => {
     const section = new URLSearchParams(window.location.search).get('section');
     // ?section=daily is an old link from when the daily question was a
-    // section here; the Overview carries the strip that opens /daily.
+    // section here; the Overview carries the card that opens /daily.
     return !section || section === 'daily' ? 'dashboard' : section;
   });
   const contentRef = useRef(null);
 
-  const history = useMemo(() => getQuizHistory(), []);
+  // Keyed on `signedIn`, not `[]`, as Progress does: auth resolves a moment
+  // after mount, and a read taken before it lands is empty and never retried.
+  const signedIn = isSignedIn(status);
+  const history = useMemo(() => (signedIn ? getQuizHistory() : []), [signedIn]);
   const performance = useMemo(() => getDomainPerformance(history), [history]);
   const accuracyByDomain = useMemo(
     () => new Map(performance.rows.filter((row) => row.domain).map((row) => [row.domain.id, row.accuracy])),
@@ -57,6 +67,10 @@ export default function Lessons() {
   const renderContent = () => {
     if (selectedSection === 'dashboard') {
       return <Dashboard onSectionChange={changeSection} />;
+    }
+
+    if (isSectionLocked(selectedSection, status)) {
+      return <AccountRequired mode={selectedSection} />;
     }
 
     if (selectedSection === 'custom') {

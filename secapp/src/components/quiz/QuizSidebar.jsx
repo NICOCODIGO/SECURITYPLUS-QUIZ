@@ -1,9 +1,11 @@
 // Section navigation for the Practice page (/lessons). Kept in its own file
 // so the page itself stays about layout and content.
 import React from 'react';
-import { FileText, LayoutDashboard, TrendingDown, Wrench } from 'lucide-react';
+import { FileText, LayoutDashboard, Lock, TrendingDown, Wrench } from 'lucide-react';
 import { securityDomains } from '../data/securityDomains';
 import { statusForAccuracy } from '@/lib/performanceStatus';
+import { useAuth } from '@/auth/AuthContext';
+import { isSectionLocked } from './accountOnly';
 
 // Question of the Day isn't here: it has its own screen at /daily, opened
 // from the strip on the Overview, so a tab for it would be a second door to
@@ -23,8 +25,14 @@ const TARGETED = [
  * Below lg it collapses to one scrollable row of pills, so a phone opens on
  * the content instead of a ten-item menu. `accuracyByDomain` (domain id →
  * percent) adds your score beside each domain once you have one.
+ *
+ * Account-only modes stay listed while signed out, with a lock: hiding them
+ * would hide that they exist, and their section says what they need.
  */
 export default function QuizSidebar({ selectedSection, onSectionChange, accuracyByDomain = new Map() }) {
+  const { status } = useAuth();
+  const locked = (id) => isSectionLocked(id, status);
+
   const pills = [
     ...START,
     ...securityDomains.map((d) => ({ id: d.id, label: `Domain ${d.number}` })),
@@ -42,12 +50,18 @@ export default function QuizSidebar({ selectedSection, onSectionChange, accuracy
                 key={item.id}
                 onClick={() => onSectionChange(item.id)}
                 aria-current={active ? 'page' : undefined}
-                className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-bold transition-colors ${
+                // `relative` contains LockMark's sr-only label, which is
+                // absolutely positioned and otherwise escapes this scroller
+                // and widens the whole page on a phone.
+                className={`relative inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-bold transition-colors ${
                   active
                     ? 'border-comptia-charcoal bg-comptia-charcoal text-white'
+                    : locked(item.id)
+                    ? 'border-slate-200 bg-slate-50 text-slate-400 hover:border-slate-400'
                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'
                 }`}
               >
+                {locked(item.id) && <LockMark />}
                 {item.label}
               </button>
             );
@@ -82,7 +96,13 @@ export default function QuizSidebar({ selectedSection, onSectionChange, accuracy
 
         <Group label="Exam & targeted">
           {TARGETED.map((item) => (
-            <Item key={item.id} item={item} active={selectedSection === item.id} onSelect={onSectionChange} />
+            <Item
+              key={item.id}
+              item={item}
+              active={selectedSection === item.id}
+              locked={locked(item.id)}
+              onSelect={onSectionChange}
+            />
           ))}
         </Group>
       </nav>
@@ -108,13 +128,25 @@ const rowClass = (active) =>
       : 'text-slate-600 hover:bg-slate-50 hover:text-comptia-charcoal'
   }`;
 
-function Item({ item, active, onSelect }) {
+function Item({ item, active, locked = false, onSelect }) {
   const Icon = item.icon;
   return (
     <button onClick={() => onSelect(item.id)} aria-current={active ? 'page' : undefined} className={rowClass(active)}>
-      <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-red-600' : ''}`} />
-      <span className={`text-sm ${active ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
+      <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-red-600' : locked ? 'text-slate-300' : ''}`} />
+      <span className={`flex-1 text-sm ${active ? 'font-bold' : 'font-medium'} ${locked && !active ? 'text-slate-400' : ''}`}>
+        {item.label}
+      </span>
+      {locked && <LockMark />}
     </button>
+  );
+}
+
+function LockMark() {
+  return (
+    <>
+      <Lock className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" aria-hidden="true" />
+      <span className="sr-only">(needs an account)</span>
+    </>
   );
 }
 

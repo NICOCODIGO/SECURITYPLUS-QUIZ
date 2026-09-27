@@ -16,25 +16,27 @@ dashboard.
 
 ## Why it works the way it does
 
-**Studying is free and needs no account.** All 444 questions, every quiz mode, the mock exam
-and Question of the Day work signed out, and always will.
+**Studying is free and needs no account.** All 444 questions, the domain quizzes and the mock
+exam work signed out, and always will.
 
 **Recording your progress does need one.** Results are kept only while you are signed in. A
 quiz taken signed out is graded and reviewed in full — you see your score and every
-explanation — it just isn't saved, so there is no history to chart.
+explanation — it just isn't saved, so there is no history to chart. The modes built on that
+history — Weakest Subject, Build Your Own and Question of the Day — need an account too.
 
 | | Signed out | Account |
 |---|---|---|
-| Lessons, quizzes, mock exam, custom builder, Question of the Day | ✅ | ✅ |
+| Lessons, domain quizzes, mock exam | ✅ | ✅ |
 | Answers graded, score and explanations shown | ✅ | ✅ |
 | Results kept after you close the page | — | ✅ |
-| Progress dashboard, streak, weakest-subject drill | — | ✅ |
+| Progress dashboard | — | ✅ |
+| Weakest Subject, Build Your Own, Question of the Day and its streak | — | ✅ |
 | Sync across devices | — | ✅ |
 | Resume an interrupted mock exam | — | planned |
 
 With no API configured (`VITE_API_URL` unset) there is no account to have, so nothing is
-recorded at all — the app still runs every quiz from its bundled question bank. The reasoning
-is in [docs/decisions.md](docs/decisions.md).
+recorded at all — the app still runs the domain quizzes and the mock exam from its bundled
+question bank. The reasoning is in [docs/decisions.md](docs/decisions.md).
 
 **There is no leaderboard and no comparison between users.** An account keeps your own study
 data safe — it never shows you how you rank against anyone, and your results are

@@ -2,10 +2,9 @@ import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
-  BookOpen,
-  CalendarDays,
   ChevronRight,
   FileText,
+  Lock,
   TrendingDown,
   Wrench,
 } from 'lucide-react';
@@ -14,27 +13,38 @@ import { getQuizHistory, getModeStats, getDomainPerformance } from '../data/quiz
 import { getQuestionPools } from '../data/questionPools';
 import { getDailyRecord } from '../data/dailyQuestion';
 import { statusForAccuracy, MOCK_PASS_MARK } from '@/lib/performanceStatus';
-import DailyQuestionStrip from './DailyQuestionStrip';
+import { useAuth, isSignedIn } from '@/auth/AuthContext';
+import { ACCOUNT_ONLY_MODES, authLinks, isSectionLocked, showsDailyQuestion } from './accountOnly';
+import DailyQuestionCard from './DailyQuestionCard';
 
 /**
  * Practice overview — the first thing the Practice page shows.
  *
- * It opens on one recommended next step rather than a wall of options, then
- * lays the rest out in three clear groups: today's question, the five
- * domains, and exam-style or targeted practice.
+ * Once there is history it opens on one recommended next step rather than a
+ * wall of options, then lays the rest out in three clear groups: today's
+ * question, the five domains, and exam-style or targeted practice. With no
+ * history there is no recommendation, and the domain list leads.
  *
  * Your own numbers sit on the thing they describe, so landing back here from
  * a quiz (TakeQuiz hard-navigates to this page) shows the result next to the
  * button for the next one. First-time visitors see what each mode involves
- * instead of rows of zeros.
+ * instead of rows of zeros. Signed out, the account-only modes (accountOnly.js)
+ * show a locked card that says so, rather than a button that leads nowhere,
+ * and Question of the Day isn't offered at all.
  */
 export default function Dashboard({ onSectionChange }) {
-  // Storage only changes when a quiz finishes, and that reloads the page.
-  const history = useMemo(() => getQuizHistory(), []);
+  const { status } = useAuth();
+  const signedIn = isSignedIn(status);
+  const dailyShown = showsDailyQuestion(status);
+
+  // Storage only changes when a quiz finishes, and that reloads the page —
+  // but auth resolves a moment after mount, so key the reads on `signedIn`.
+  // A read taken before it lands is empty and would never be retried.
+  const history = useMemo(() => (signedIn ? getQuizHistory() : []), [signedIn]);
   const modes = useMemo(() => getModeStats(history), [history]);
   const performance = useMemo(() => getDomainPerformance(history), [history]);
   const pools = useMemo(() => getQuestionPools(history), [history]);
-  const answeredToday = useMemo(() => getDailyRecord() !== null, []);
+  const answeredToday = useMemo(() => signedIn && getDailyRecord() !== null, [signedIn]);
 
   const hasHistory = history.length > 0;
   const byDomainId = new Map(
@@ -44,13 +54,15 @@ export default function Dashboard({ onSectionChange }) {
   const lowest = performance.ranked[0] || null;
   const mock = modes.mock;
 
-  const next = pickNextStep({ hasHistory, answeredToday, mock, lowest });
+  const next = pickNextStep({ hasHistory, mock, lowest });
 
   return (
     <div className="space-y-8">
-      <NextStep step={next} onSectionChange={onSectionChange} />
+      {next && <NextStep step={next} onSectionChange={onSectionChange} />}
 
-      <DailyQuestionStrip />
+      {/* With no other recommendation and nothing answered yet today,
+          today's question is the next step. */}
+      {dailyShown && <DailyQuestionCard lead={!next && !answeredToday} />}
 
       <section className="space-y-3">
         <SectionHeading
@@ -81,7 +93,7 @@ export default function Dashboard({ onSectionChange }) {
           title="Exam & targeted practice"
           hint="Test yourself under exam conditions, or aim at what you keep missing."
         />
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <ModeCard
             featured
             icon={FileText}
@@ -95,30 +107,38 @@ export default function Dashboard({ onSectionChange }) {
             cta={mock.count ? 'Take another' : 'Start mock exam'}
             onClick={() => onSectionChange('mock')}
           />
-          <ModeCard
-            icon={TrendingDown}
-            title="Weakest Subject"
-            description="20 questions from whichever domain you currently score lowest in."
-            facts={
-              lowest
-                ? `Next up: ${lowest.title} (${lowest.accuracy}%)`
-                : 'Unlocks after your first quiz'
-            }
-            cta="Drill it"
-            onClick={() => onSectionChange('weakest')}
-          />
-          <ModeCard
-            icon={Wrench}
-            title="Build Your Own"
-            description="Mix never-seen, missed and flagged questions, filtered by domain and difficulty."
-            facts={
-              modes.custom.count
-                ? `${modes.custom.count} built · ${pools.flagged.length} flagged · ${pools.incorrect.length} to retry`
-                : `${pools.new.length} questions you haven't seen yet`
-            }
-            cta="Build a quiz"
-            onClick={() => onSectionChange('custom')}
-          />
+          {isSectionLocked('weakest', status) ? (
+            <LockedModeCard icon={TrendingDown} section="weakest" status={status} />
+          ) : (
+            <ModeCard
+              icon={TrendingDown}
+              title="Weakest Subject"
+              description="20 questions from whichever domain you currently score lowest in."
+              facts={
+                lowest
+                  ? `Next up: ${lowest.title} (${lowest.accuracy}%)`
+                  : 'Unlocks after your first quiz'
+              }
+              cta="Drill it"
+              onClick={() => onSectionChange('weakest')}
+            />
+          )}
+          {isSectionLocked('custom', status) ? (
+            <LockedModeCard icon={Wrench} section="custom" status={status} />
+          ) : (
+            <ModeCard
+              icon={Wrench}
+              title="Build Your Own"
+              description="Mix never-seen, missed and flagged questions, filtered by domain and difficulty."
+              facts={
+                modes.custom.count
+                  ? `${modes.custom.count} built · ${pools.flagged.length} flagged · ${pools.incorrect.length} to retry`
+                  : `${pools.new.length} questions you haven't seen yet`
+              }
+              cta="Build a quiz"
+              onClick={() => onSectionChange('custom')}
+            />
+          )}
         </div>
       </section>
     </div>
@@ -126,31 +146,16 @@ export default function Dashboard({ onSectionChange }) {
 }
 
 /**
- * One recommendation, chosen from where the user actually is: brand new,
- * carrying a weak domain, never sat a mock, or keeping sharp.
+ * One recommendation, chosen from where the user actually is: carrying a weak
+ * domain, never sat a mock, or keeping sharp.
+ *
+ * Null with no quiz history. A "take your first quiz" card used to sit here
+ * and was removed: the domain list right below already is that choice, and
+ * signed out it was the only thing the card could ever say. Signed in,
+ * today's question takes the lead slot instead (see DailyQuestionCard).
  */
-function pickNextStep({ hasHistory, answeredToday, mock, lowest }) {
-  if (!hasHistory) {
-    return answeredToday
-      ? {
-          icon: BookOpen,
-          eyebrow: 'Start here',
-          title: 'Take your first quiz',
-          body: 'A short quiz on 1.0 General Security Concepts, with an explanation after every answer.',
-          cta: 'Start Domain 1.0',
-          section: 'domain1',
-          alt: { label: 'Or build your own quiz', section: 'custom' },
-        }
-      : {
-          icon: CalendarDays,
-          eyebrow: 'Start here',
-          title: "Warm up with today's question",
-          body: 'One question, about a minute. Then try a short quiz on any domain below.',
-          cta: "Answer today's question",
-          href: '/daily',
-          alt: { label: 'Or jump into Domain 1.0', section: 'domain1' },
-        };
-  }
+function pickNextStep({ hasHistory, mock, lowest }) {
+  if (!hasHistory) return null;
 
   if (lowest && lowest.accuracy < 80) {
     return {
@@ -190,10 +195,6 @@ function pickNextStep({ hasHistory, answeredToday, mock, lowest }) {
 
 function NextStep({ step, onSectionChange }) {
   const Icon = step.icon;
-  // A step points at a section of this page, or at a page of its own (the
-  // daily question), so the button is a button or a link to match.
-  const cta = step.href ? { as: Link, to: step.href } : { as: 'button', onClick: () => onSectionChange(step.section) };
-  const Cta = cta.as;
   return (
     <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <span className="absolute inset-y-0 left-0 w-1 bg-red-600" aria-hidden="true" />
@@ -207,13 +208,13 @@ function NextStep({ step, onSectionChange }) {
           <p className="text-sm text-slate-600 mt-0.5">{step.body}</p>
         </div>
         <div className="flex flex-col items-stretch sm:items-end gap-1.5 flex-shrink-0">
-          <Cta
-            {...(step.href ? { to: step.href } : { onClick: cta.onClick })}
+          <button
+            onClick={() => onSectionChange(step.section)}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-700 transition-colors"
           >
             {step.cta}
             <ArrowRight className="h-4 w-4" />
-          </Cta>
+          </button>
           {step.alt && (
             <button
               onClick={() => onSectionChange(step.alt.section)}
@@ -323,6 +324,53 @@ function ModeCard({ icon, title, description, facts, cta, onClick, featured = fa
         {cta}
         <ArrowRight className="h-4 w-4" />
       </button>
+    </div>
+  );
+}
+
+/**
+ * An account-only mode, signed out: greyed, with a lock, and the reason in
+ * place of the pitch. Same shape as ModeCard so the row stays aligned.
+ */
+function LockedModeCard({ icon, section, status }) {
+  const Icon = icon;
+  const mode = ACCOUNT_ONLY_MODES[section];
+  // No API, so there is no account to create — say that instead.
+  const unavailable = status === 'unavailable';
+  const links = authLinks(section);
+
+  return (
+    <div className="flex flex-col rounded-xl border border-slate-200 bg-slate-50 p-5">
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-slate-200 text-slate-400">
+          <Icon className="h-5 w-5" />
+        </span>
+        <h3 className="flex-1 font-black leading-tight text-slate-500">{mode.title}</h3>
+        <Lock className="h-4 w-4 flex-shrink-0 text-slate-400" aria-hidden="true" />
+      </div>
+      <p className="mt-3 text-sm font-bold text-comptia-charcoal">
+        {unavailable ? 'Needs an account.' : 'To access this, create an account.'}
+      </p>
+      <p className="mt-1 flex-1 text-sm text-slate-500">{mode.reason}</p>
+      {unavailable ? (
+        <p className="mt-3 text-xs font-bold text-slate-400">This build has no server, so no accounts.</p>
+      ) : (
+        <>
+          <p className="mt-3 text-xs font-bold text-slate-500">
+            Have an account?{' '}
+            <Link to={links.signIn} className="text-red-600 hover:text-red-700 hover:underline">
+              Sign in
+            </Link>
+          </p>
+          <Link
+            to={links.signUp}
+            className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border-2 border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-comptia-charcoal transition-colors hover:border-comptia-charcoal"
+          >
+            Create free account
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </>
+      )}
     </div>
   );
 }

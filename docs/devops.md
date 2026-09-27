@@ -114,8 +114,9 @@ Locally, `spring-boot-docker-compose` overrides the datasource values with the r
 host and port, so the defaults above are only a fallback.
 
 The front end reads one: **`VITE_API_URL`**, and it is baked in at **build** time, not read at
-runtime. Leave it unset and the app falls back to the bundled question bank, so every quiz still
-runs — but nothing is recorded, because no API means no account. It does **not** fall back to
+runtime. Leave it unset and the app falls back to the bundled question bank, so the domain
+quizzes and mock exam still run — but nothing is recorded, because no API means no account (and
+so Weakest Subject and Build Your Own stay locked). It does **not** fall back to
 browser storage; that was removed deliberately. See [decisions.md](decisions.md).
 
 Because the value is compiled into the bundle, changing the domain means **rebuilding and

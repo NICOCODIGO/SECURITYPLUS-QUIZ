@@ -43,15 +43,17 @@ verify.sh   the one verification command
 
 ## The product rule everything inherits
 
-**Studying is free without an account.** All 444 questions and every quiz mode work
-anonymously. **Progress reporting does not** — results are only kept while signed in.
+**Studying is free without an account.** All 444 questions, the domain quizzes and the mock
+exam work anonymously. **Progress reporting does not** — results are only kept while signed
+in — and neither do the modes built on those results.
 
 | | Anonymous | Account |
 |---|---|---|
-| Lessons, quizzes, mock exam, custom builder, Question of the Day | ✅ | ✅ |
+| Lessons, domain quizzes, mock exam | ✅ | ✅ |
 | Answers graded, score and explanations shown | ✅ | ✅ |
 | Results kept after the page closes | — | ✅ |
-| Progress dashboard · streak · weakest-subject drill | — | ✅ |
+| Progress dashboard | — | ✅ |
+| Weakest Subject · Build Your Own · Question of the Day and its streak | — | ✅ |
 | Cross-device sync | — | ✅ |
 | Resume an interrupted mock exam | — | Phase 4 |
 
@@ -62,9 +64,10 @@ reasoning and what it costs.
 
 Three rules that follow from this, and that everything else is built around:
 
-1. **Never put a *studying* feature behind the login.** Every quiz and all 444 questions work
-   signed out and always must. Recording the results is the part that needs an account — a
-   deliberate narrowing of the original rule, see [decisions.md](decisions.md).
+1. **Never put a *studying* feature behind the login.** The domain quizzes, the mock exam and
+   all 444 questions work signed out and always must. Recording the results needs an account,
+   and so do the modes built on them (Weakest Subject, Build Your Own, Question of the Day) —
+   deliberate narrowings of the original rule, see [decisions.md](decisions.md).
 2. **Nothing comparative.** No leaderboard, ranking, percentiles or cross-user visibility —
    rejected deliberately, and it set the shape of the whole back end.
 3. **Storage is per account.** Keys are namespaced by user id, so two people sharing a browser

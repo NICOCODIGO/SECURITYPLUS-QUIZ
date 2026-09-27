@@ -127,9 +127,9 @@ export default function Account() {
       <div className="max-w-2xl mx-auto py-10 px-4">
         <h1 className="text-3xl font-black text-comptia-charcoal">Account settings</h1>
         <p className="text-slate-600 mt-2">
-          Sign in to manage your email address and two-factor sign-in. Every quiz and all 444
-          questions work without an account — this page is only about keeping the account itself
-          safe.
+          Sign in to manage your email address and two-factor sign-in. The domain quizzes, the
+          mock exam and all 444 questions work without an account — this page is only about
+          keeping the account itself safe.
         </p>
         <Link to="/login?next=/account" className="inline-block mt-6">
           <Button className="bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-6 rounded-lg">

@@ -107,9 +107,8 @@ export default function AuthForm({ mode }) {
       <div className="max-w-md mx-auto py-10 px-4">
         <h1 className="text-3xl font-black text-comptia-charcoal">Accounts aren&apos;t available</h1>
         <p className="text-slate-600 mt-2">
-          This build has no server configured, so there&apos;s nothing to sign in to. Every quiz,
-          the full question bank and Question of the Day all still work — results just
-          aren&apos;t saved.
+          This build has no server configured, so there&apos;s nothing to sign in to. The domain
+          quizzes and the mock exam still work — results just aren&apos;t saved.
         </p>
         <Link to="/lessons" className="inline-block mt-6">
           <Button className="bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-6 rounded-lg">
