@@ -95,6 +95,15 @@ resource "aws_amplify_app" "web" {
               - .npm/**/*
   EOT
 
+  # Cookies in the cache key, which is also what gets them forwarded to the
+  # /api proxy target. Without it the refresh cookie may never reach App
+  # Runner, and every session ends at the 15-minute access-token expiry.
+  # Costs no cache hits: that cookie is scoped to /api/v1/auth, so page and
+  # asset requests never carry it. API responses are no-store regardless.
+  cache_config {
+    type = "AMPLIFY_MANAGED"
+  }
+
   custom_headers = yamlencode({
     customHeaders = [{
       pattern = "**"
