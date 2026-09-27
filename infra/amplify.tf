@@ -104,10 +104,16 @@ resource "aws_amplify_app" "web" {
     type = "AMPLIFY_MANAGED"
   }
 
+  # Nested under `applications` with the appRoot, because this is a monorepo
+  # app: the flat top-level `customHeaders` form fails every build at the
+  # deploy step ("Monorepo spec provided without applications key").
   custom_headers = yamlencode({
-    customHeaders = [{
-      pattern = "**"
-      headers = [for key, value in local.security_headers : { key = key, value = value }]
+    applications = [{
+      appRoot = "secapp"
+      customHeaders = [{
+        pattern = "**"
+        headers = [for key, value in local.security_headers : { key = key, value = value }]
+      }]
     }]
   })
 
