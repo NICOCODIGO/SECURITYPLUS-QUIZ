@@ -56,6 +56,39 @@ resource "aws_cloudfront_function" "redirect_to_apex" {
   code    = templatefile("${path.module}/functions/redirect-to-apex.js", { apex = var.domain_name })
 }
 
+# ---------------------------------------------------------- response headers --
+
+# The same headers Amplify serves (local.security_headers, in amplify.tf), for
+# as long as this distribution still holds the domain. Pages only: the API sets
+# its own through Spring Security.
+resource "aws_cloudfront_response_headers_policy" "security" {
+  name    = "${local.name}-security-headers"
+  comment = "CSP, anti-framing, HSTS, nosniff, referrer policy for the SPA"
+
+  security_headers_config {
+    content_security_policy {
+      content_security_policy = local.content_security_policy
+      override                = true
+    }
+    content_type_options {
+      override = true
+    }
+    frame_options {
+      frame_option = local.security_headers["X-Frame-Options"]
+      override     = true
+    }
+    referrer_policy {
+      referrer_policy = local.security_headers["Referrer-Policy"]
+      override        = true
+    }
+    strict_transport_security {
+      access_control_max_age_sec = 31536000
+      include_subdomains         = true
+      override                   = true
+    }
+  }
+}
+
 # ------------------------------------------------------------- distribution --
 
 resource "aws_cloudfront_distribution" "site" {
@@ -93,8 +126,9 @@ resource "aws_cloudfront_distribution" "site" {
     viewer_protocol_policy = "redirect-to-https"
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD"]
-    cache_policy_id        = data.aws_cloudfront_cache_policy.caching_optimized.id
-    compress               = true
+    cache_policy_id            = data.aws_cloudfront_cache_policy.caching_optimized.id
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    compress                   = true
 
     function_association {
       event_type   = "viewer-request"

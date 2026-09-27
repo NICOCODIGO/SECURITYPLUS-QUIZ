@@ -12,6 +12,43 @@
 # of it. Until the domain moves, this serves only its amplifyapp.com address,
 # which is where it is tested.
 
+# ------------------------------------------------------- security headers --
+
+# One definition, served by whichever front door is live: Amplify below, and
+# the CloudFront distribution in web.tf until the domain moves. Without them the
+# login and 2FA pages can be framed by another site (clickjacking) and nothing
+# limits where scripts may come from.
+#
+# The CSP was checked against the production build in a real browser: no page
+# needs an inline script, styles need 'unsafe-inline' (component libraries set
+# style attributes), and the only third-party resource is Unsplash imagery on
+# Home. The API is same-origin (VITE_API_URL is the site itself), so
+# connect-src 'self' covers it - on the amplifyapp.com test address too, since
+# the build there points at that address. Adding a CDN, font host or analytics
+# script means adding it here, or the browser will block it.
+locals {
+  content_security_policy = join("; ", [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https://images.unsplash.com",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
+  ])
+
+  security_headers = {
+    "Strict-Transport-Security" = "max-age=31536000; includeSubDomains"
+    "X-Content-Type-Options"    = "nosniff"
+    "X-Frame-Options"           = "DENY"
+    "Referrer-Policy"           = "strict-origin-when-cross-origin"
+    "Content-Security-Policy"   = local.content_security_policy
+  }
+}
+
 resource "aws_amplify_app" "web" {
   name       = local.name
   repository = var.github_repository
@@ -57,6 +94,13 @@ resource "aws_amplify_app" "web" {
             paths:
               - .npm/**/*
   EOT
+
+  custom_headers = yamlencode({
+    customHeaders = [{
+      pattern = "**"
+      headers = [for key, value in local.security_headers : { key = key, value = value }]
+    }]
+  })
 
   # Order matters: the first rule that matches wins.
 
