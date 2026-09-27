@@ -97,7 +97,7 @@ Read by `server/src/main/resources/application.properties`. All have local defau
 | `AUTH_COOKIE_SAME_SITE` | `Strict` | `Strict` once the API is same-domain |
 | `AUTH_COOKIE_SECURE` | `false` | `true` |
 | `AUTH_TRUST_FORWARDED_FOR` | `false` | `true` behind CloudFront |
-| `AUTH_FORWARDED_FOR_HOPS` | `1` | `2`: CloudFront, then App Runner |
+| `AUTH_FORWARDED_FOR_HOPS` | `1` | `2` behind Amplify's `/api` proxy (observed, see `infra/api.tf`) |
 
 Three of those have failure modes worth knowing, because none of them look like a bug:
 
@@ -108,10 +108,13 @@ Three of those have failure modes worth knowing, because none of them look like 
   Proxies *append* to `X-Forwarded-For` (none of ours overwrite it), so the caller is the entry
   this many from the right and everything further left is whatever the caller sent. Too high
   reads a forged entry, so a script picks a fresh bucket per request; too low reads a proxy's
-  address, so strangers share one. It changes whenever the chain in front of App Runner does,
-  **including the move to Amplify**. Check it after any such change: send
-  `forgot-password` for a made-up address 11 times through the site, each with a different
-  `X-Forwarded-For`. The 11th must be a 429. If it is a 204, the value is too high.
+  address, so strangers share one. It changes whenever the chain in front of App Runner does:
+  it was 1 straight through CloudFront and is 2 through Amplify's `/api` proxy. **Read it off,
+  don't guess it:** set `LOGGING_LEVEL_COM_SECPLUS_AUTH=DEBUG` on App Runner (package level —
+  Boot lowercases logging env vars, so a class name never matches), send a request through
+  the site with `X-Forwarded-For: 6.6.6.6`, and `AuthController` logs the whole header and the
+  entry it chose. The chosen one must be your own public IP (`curl checkip.amazonaws.com`),
+  never `6.6.6.6`. Turn the logging off afterwards: it records addresses.
   Per-IP limits stay best-effort even when right, because App Runner can be called directly;
   that is why every limit protecting a person is also per account or global
   (`LoginRateLimiter`).

@@ -112,12 +112,14 @@ resource "aws_apprunner_service" "api" {
 
           # Needed: App Runner's own proxy is the socket peer for every request,
           # so without the header every user would share one rate-limit bucket.
-          # Proxies APPEND to X-Forwarded-For - CloudFront adds the viewer, then
-          # App Runner adds CloudFront - so the caller is 2 from the right, and
-          # anything further left is caller-supplied. App Runner can also be
-          # called directly, which is why every limit that protects a person is
-          # per account or global too. See AuthController.clientIp, and
-          # docs/devops.md for how to check this value after a deploy.
+          # Proxies APPEND to X-Forwarded-For, and anything left of what ours
+          # added is caller-supplied. Observed through Amplify's /api proxy:
+          #   [<caller-supplied...>, <viewer>, <Amplify's edge address>]
+          # so the caller is 2 from the right. App Runner itself adds nothing.
+          # (Straight through the old CloudFront distribution it was 1.) App
+          # Runner can also be called directly, which is why every limit that
+          # protects a person is per account or global too. See
+          # AuthController.clientIp, and docs/devops.md for how to re-check.
           AUTH_TRUST_FORWARDED_FOR = "true"
           AUTH_FORWARDED_FOR_HOPS  = "2"
 

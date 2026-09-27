@@ -270,7 +270,7 @@ public class AuthController {
 	 * Who the per-IP rate limits count against.
 	 *
 	 * X-Forwarded-For is a list that every proxy APPENDS to - CloudFront and
-	 * App Runner included; neither overwrites it. So everything to the left is
+	 * Amplify included; none overwrites it. So everything to the left is
 	 * whatever the caller sent, and only the entries our own proxies added can
 	 * be believed. The client is the one `forwardedForHops` from the right: the
 	 * address the outermost proxy saw. Taking the FIRST entry, as this once

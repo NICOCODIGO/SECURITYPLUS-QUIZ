@@ -47,7 +47,7 @@ public class AuthProperties {
 	 *
 	 * The client is this many entries from the right. 1 means "the last entry",
 	 * which is right for one proxy (and for the tests, which send one value).
-	 * Behind CloudFront and then App Runner it is 2. Too low reads a proxy's
+	 * Behind Amplify's /api proxy it is 2 (observed; see api.tf). Too low reads a proxy's
 	 * address, so everyone shares a bucket; too high reads what the caller
 	 * sent. Check the deployed value by sending spoofed headers and watching
 	 * the per-IP limit still trip (docs/devops.md).

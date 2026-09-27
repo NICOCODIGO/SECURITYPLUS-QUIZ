@@ -27,7 +27,7 @@ class ClientIpTests {
 		return new AuthController(null, null, properties).clientIp(request);
 	}
 
-	/** CloudFront appends the viewer, then App Runner appends CloudFront. */
+	/** As observed through Amplify: its CDN appends the viewer, its proxy appends itself. */
 	@Test
 	void behindTwoProxiesTheCallerIsSecondFromTheRight() {
 		assertThat(clientIp(true, 2, "198.51.100.7, 130.176.1.1")).isEqualTo("198.51.100.7");
