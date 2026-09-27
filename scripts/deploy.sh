@@ -42,6 +42,7 @@ else
       -e AWS_CONFIG_FILE=/aws/config -e AWS_SHARED_CREDENTIALS_FILE=/aws/credentials \
       -e AWS_PROFILE -e AWS_REGION -e AWS_DEFAULT_REGION \
       -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN \
+      -e TF_VAR_github_access_token -e TF_VAR_amplify_api_url -e TF_VAR_extra_cors_origins \
       "$TF_IMAGE" "$@"
   }
 fi
@@ -97,6 +98,25 @@ if [ -s infra/terraform.tfstate ]; then
   echo "it still holds the secrets in plaintext; delete it once a plan shows no changes."
 else
   tf -chdir=infra init -input=false -reconfigure -backend-config="bucket=$STATE_BUCKET"
+fi
+
+# The Amplify app (infra/amplify.tf) must either be in state already, or be
+# creatable - which needs a GitHub token. An app made in the console first is
+# neither: applying would try to create a second one. Checked here, before
+# anything ships, rather than failing at the apply after the image is pushed.
+if ! tf -chdir=infra state list 2>/dev/null | grep -qx 'aws_amplify_app.web'; then
+  EXISTING_APP=$("$AWS" amplify list-apps --region "$REGION" \
+    --query "apps[?contains(repository, 'SECURITYPLUS-QUIZ')].appId | [0]" --output text 2>/dev/null || true)
+  if [ -n "$EXISTING_APP" ] && [ "$EXISTING_APP" != "None" ]; then
+    echo "Amplify app $EXISTING_APP exists but Terraform doesn't know about it. Import it once:" >&2
+    echo "  terraform -chdir=infra import aws_amplify_app.web $EXISTING_APP" >&2
+    echo "  terraform -chdir=infra import aws_amplify_branch.main $EXISTING_APP/main" >&2
+    exit 1
+  elif [ -z "${TF_VAR_github_access_token:-}" ]; then
+    echo "The Amplify app doesn't exist yet, and creating it needs a GitHub token." >&2
+    echo "Set TF_VAR_github_access_token and rerun - see infra/README.md, 'Amplify'." >&2
+    exit 1
+  fi
 fi
 
 # App Runner rejects any update while a rollout is in flight
@@ -178,6 +198,16 @@ fi
 "$AWS" apprunner start-deployment --service-arn "$SERVICE_ARN" --region "$REGION" >/dev/null 2>&1 \
   && echo "rollout triggered" \
   || echo "already deploying — skipping"
+
+# Amplify rebuilds by itself on every push to main, but not when its settings
+# change (VITE_API_URL, say), and not when the app is first created. So ask
+# for a build of main's latest commit - never this machine's working tree.
+# Tolerated failure: one is refused while another is already running.
+AMPLIFY_APP_ID=$(tf -chdir=infra output -raw amplify_app_id)
+"$AWS" amplify start-job --app-id "$AMPLIFY_APP_ID" --branch-name main --job-type RELEASE \
+  --region "$REGION" >/dev/null 2>&1 \
+  && echo "Amplify build of main started: $(tf -chdir=infra output -raw amplify_branch_url)" \
+  || echo "Amplify is already building - skipping"
 
 # ---------------------------------------------------------------------- web --
 

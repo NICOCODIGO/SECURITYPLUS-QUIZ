@@ -36,6 +36,16 @@ output "apprunner_service_arn" {
   value       = aws_apprunner_service.api.arn
 }
 
+output "amplify_app_id" {
+  description = "For `aws amplify start-job` and the Amplify console."
+  value       = aws_amplify_app.web.id
+}
+
+output "amplify_branch_url" {
+  description = "The front end on Amplify's own address. Where it is tested before the domain moves; pass it as extra_cors_origins while it is."
+  value       = "https://main.${aws_amplify_app.web.default_domain}"
+}
+
 output "apprunner_service_url" {
   description = "The API's direct domain. Reaching it bypasses CloudFront, so the SameSite=Strict cookie will not be sent — useful for health checks, not for signing in."
   value       = aws_apprunner_service.api.service_url

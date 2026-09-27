@@ -1,12 +1,12 @@
 # The VPC exists for one reason: App Runner cannot reach a private RDS instance
 # without a VPC connector, and RDS should not be public.
 #
-# There is deliberately NO NAT gateway. A VPC connector routes App Runner's
-# outbound traffic through these subnets, which normally forces a NAT at roughly
-# $32/month — often the largest line on a small account's bill. This app makes
-# no outbound internet calls: no mailer, no third-party APIs, no webhooks. It
-# talks to RDS and nothing else. If something here ever does need the internet,
-# that is the moment to add a NAT, not before.
+# There is deliberately NO NAT gateway. A VPC connector routes ALL of App
+# Runner's outbound traffic through these subnets, so without one the app has
+# no internet at all. It talks to exactly two things: RDS, and SES for mail.
+# SES is reached through an interface endpoint below (about $7/month) rather
+# than a NAT (about $32/month). No third-party APIs, no webhooks. If something
+# here ever needs the wider internet, that is the moment to add a NAT.
 
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
@@ -49,6 +49,16 @@ resource "aws_security_group" "api" {
     cidr_blocks = [aws_vpc.main.cidr_block]
   }
 
+  # A CIDR rather than the endpoint's security group: that group already names
+  # this one, and two groups referencing each other inline is a cycle.
+  egress {
+    description = "SES SMTP via the VPC endpoint"
+    from_port   = 587
+    to_port     = 587
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.main.cidr_block]
+  }
+
   tags = { Name = "${local.name}-api" }
 }
 
@@ -74,4 +84,50 @@ resource "aws_apprunner_vpc_connector" "main" {
   vpc_connector_name = "${local.name}-connector"
   subnets            = aws_subnet.private[*].id
   security_groups    = [aws_security_group.api.id]
+}
+
+# ------------------------------------------------------------------ mail --
+
+# Without this, every verification and reset email fails to connect, and
+# Mailer logs the failure and carries on by design, so nothing visibly breaks.
+# Private DNS makes email-smtp.<region>.amazonaws.com (MAIL_HOST, unchanged)
+# resolve to the endpoint from inside the VPC.
+data "aws_vpc_endpoint_service" "smtp" {
+  service_name = "com.amazonaws.${var.region}.email-smtp"
+}
+
+resource "aws_security_group" "smtp_endpoint" {
+  name        = "${local.name}-smtp-endpoint"
+  description = "SES SMTP interface endpoint"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description     = "SMTP submission from the API only"
+    from_port       = 587
+    to_port         = 587
+    protocol        = "tcp"
+    security_groups = [aws_security_group.api.id]
+  }
+
+  tags = { Name = "${local.name}-smtp-endpoint" }
+}
+
+# Placed only in subnets whose AZ offers the service: email-smtp is not in
+# every AZ (in us-east-1 today, a/c/d but not b), and naming an unsupported one
+# fails the apply. One AZ, not two, because an interface endpoint bills per AZ
+# and every subnet in the VPC can reach it; losing that AZ delays mail, which
+# is already built to fail softly.
+resource "aws_vpc_endpoint" "ses_smtp" {
+  vpc_id              = aws_vpc.main.id
+  service_name        = data.aws_vpc_endpoint_service.smtp.service_name
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  security_group_ids  = [aws_security_group.smtp_endpoint.id]
+
+  subnet_ids = slice([
+    for subnet in aws_subnet.private : subnet.id
+    if contains(data.aws_vpc_endpoint_service.smtp.availability_zones, subnet.availability_zone)
+  ], 0, 1)
+
+  tags = { Name = "${local.name}-ses-smtp" }
 }

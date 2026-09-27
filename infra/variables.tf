@@ -83,3 +83,30 @@ variable "image_tag" {
   type        = string
   default     = "latest"
 }
+
+# ------------------------------------------------------------------ amplify --
+
+variable "github_repository" {
+  description = "The repository Amplify builds the front end from."
+  type        = string
+  default     = "https://github.com/NICOCODIGO/SECURITYPLUS-QUIZ"
+}
+
+variable "github_access_token" {
+  description = "Needed once, when the Amplify app is first created, to connect it to GitHub. Pass as TF_VAR_github_access_token; never commit it. Ignored after creation."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "amplify_api_url" {
+  description = "VITE_API_URL for the Amplify build. Empty means the branch's own amplifyapp.com address, which is right until the domain moves to Amplify."
+  type        = string
+  default     = ""
+}
+
+variable "extra_cors_origins" {
+  description = "Comma-separated origins allowed alongside site_url, e.g. the amplifyapp.com address while it is being tested. A variable rather than a reference to the Amplify app, because the app already references App Runner and that would be a cycle."
+  type        = string
+  default     = ""
+}

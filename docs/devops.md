@@ -272,6 +272,11 @@ Nothing here is clicked together. `infra/mail.tf` creates the IAM user and deriv
 password from its access key — that derivation is an HMAC of the secret key, not the secret key
 itself, which is why pasting the IAM secret into `MAIL_PASSWORD` fails with a 535.
 
+**The API reaches SES through a VPC endpoint, not the internet.** App Runner's outbound traffic
+all goes into the VPC (it needs that for RDS), and the VPC has no NAT. `infra/network.tf` adds an
+SES SMTP interface endpoint with private DNS, so `MAIL_HOST` resolves to it unchanged. Remove it
+and mail stops with nothing visibly failing: see [infra/README.md](../infra/README.md#cost).
+
 Avoid the console route for this. It now leads into **Mail Manager**, whose wizard builds an
 *inbound* ingress endpoint that bills by the hour, has nothing to do with sending, and issues
 `inp-` prefixed credentials that do not work for SMTP auth.

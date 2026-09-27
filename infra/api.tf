@@ -119,11 +119,13 @@ resource "aws_apprunner_service" "api" {
           # Holds only because /api/* is served from the site's own domain.
           AUTH_COOKIE_SAME_SITE = "Strict"
 
-          # Same-origin means CORS never fires, but a non-wildcard value is the
-          # right thing to have if that ever changes. Supplied as a variable
-          # rather than read from the distribution — see variables.tf for why
-          # that would be a cycle.
-          CORS_ALLOWED_ORIGINS = var.site_url
+          # Same-origin to the browser, but not to Spring: behind a proxy the
+          # Host it sees is App Runner's while Origin is the site's, so every
+          # write is checked as CORS and an origin missing here is refused.
+          # That is why a site being tested on another address (Amplify's
+          # amplifyapp.com, before the domain moves) needs extra_cors_origins.
+          # Variables rather than references — see variables.tf for the cycle.
+          CORS_ALLOWED_ORIGINS = join(",", compact([var.site_url, var.extra_cors_origins]))
 
           # SES SMTP in the same region. Port 587 with STARTTLS rather than 465
           # implicit TLS, because that is what JavaMailSender defaults to.

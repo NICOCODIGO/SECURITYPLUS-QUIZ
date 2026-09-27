@@ -18,17 +18,43 @@ Route 53 ── ACM certificate (us-east-1) + SES domain identity, DKIM, custom 
 | File | Holds |
 |---|---|
 | `main.tf` | Providers, the S3 state backend, shared locals |
-| `network.tf` | VPC, subnets, the App Runner VPC connector |
+| `network.tf` | VPC, subnets, the App Runner VPC connector, the SES SMTP endpoint |
 | `database.tf` | RDS Postgres, its generated password, the SSM parameters |
 | `api.tf` | ECR, the two App Runner IAM roles, the service itself |
 | `web.tf` | S3, the distribution, the `www` → apex function |
 | `dns.tf` | The hosted zone lookup, every DNS record, the certificate, the SES identity |
 | `mail.tf` | The SES SMTP user and its derived password |
+| `amplify.tf` | The front end on Amplify: builds on every push to `main`. Being moved to; see below |
 | `functions/` | CloudFront Function source, rendered with `templatefile` |
 
 Standing up a **new** domain is the one case where `terraform apply -target=...` is correct, and
 [docs/devops.md](../docs/devops.md) has the exact command. Everything in `dns.tf` that waits polls
 public DNS, so certificate validation cannot pass until the registry has delegated the domain.
+
+## Amplify
+
+The front end is moving from S3 + CloudFront (`web.tf`) to Amplify, so a push to `main` goes live
+without running a script. The API does not move: it stays on App Runner and still ships with
+`deploy.sh`. **When a change touches both, run `deploy.sh` before merging**, or Amplify ships a
+front end that calls endpoints the running API does not have yet.
+
+Amplify currently runs **alongside** the live site, on its own `amplify_branch_url`, and serves
+nothing on `certucation.click` until the domain is moved. `/api/*` reaches App Runner through a
+200 rewrite in `amplify.tf`, which is a proxy, so the one-domain rule below still holds.
+
+**First-time setup**, once per AWS account:
+
+1. In GitHub, install the **AWS Amplify** GitHub App on this repository.
+2. Create a GitHub personal access token for it, following AWS's guide *"Setting up the Amplify
+   GitHub App for AWS CloudFormation, CLI, and SDK deployments"*. Amplify uses it once, to
+   connect; Terraform ignores it afterwards.
+3. `export TF_VAR_github_access_token=<token>` and run `./scripts/deploy.sh`. Without the token
+   it stops before shipping anything.
+4. `main` is what gets built, so merge to it first.
+
+To test on the Amplify address, it has to be an allowed origin: rerun with
+`TF_VAR_extra_cors_origins=<amplify_branch_url>`. Spring sees App Runner's host but the site's
+`Origin`, so it treats every write as CORS (see the comment in `api.tf`).
 
 ## The three things that will bite you
 
@@ -60,8 +86,14 @@ are pennies at portfolio traffic. **App Runner is the real cost** — it bills f
 memory even while idle, so this is not a scale-to-zero stack.
 
 There is deliberately **no NAT gateway** (~$32/month, usually the largest avoidable line item).
-A VPC connector would normally require one, but this app makes no outbound internet calls — it
-talks to RDS and nothing else. Add one only when something actually needs egress.
+A VPC connector sends all of App Runner's outbound traffic into the VPC, so without a NAT the app
+has no internet. It needs exactly two destinations: RDS, which is inside the VPC, and SES for
+mail, which is reached through an **SES SMTP interface endpoint** (~$7.30/month, one AZ) in
+`network.tf`. Add a NAT only when something needs the wider internet.
+
+That endpoint is not optional. Without it the SMTP connection simply never opens, and because
+`Mailer` logs failures and carries on, sign-up and password reset appear to work while no email is
+ever sent.
 
 **Set a billing alarm before the first apply, not after.**
 
