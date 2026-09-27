@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -47,6 +48,24 @@ public class User {
 	@Column(name = "last_login_at")
 	private Instant lastLoginAt;
 
+	/**
+	 * Whether the address has been proved reachable.
+	 *
+	 * This gates password RESET and nothing else. It must never gate studying:
+	 * every quiz works signed out, so gating it signed in would be a strict
+	 * downgrade for having made an account.
+	 */
+	@Column(name = "email_verified", nullable = false)
+	private boolean emailVerified;
+
+	/** Null means 2FA is off. */
+	@Column(name = "two_factor_method")
+	@Convert(converter = TwoFactorMethod.Mapping.class)
+	private TwoFactorMethod twoFactorMethod;
+
+	@Column(name = "totp_secret")
+	private String totpSecret;
+
 	protected User() {
 		// for JPA
 	}
@@ -87,5 +106,60 @@ public class User {
 
 	public void recordLogin(Instant at) {
 		this.lastLoginAt = at;
+	}
+
+	public boolean isEmailVerified() {
+		return emailVerified;
+	}
+
+	public void markEmailVerified() {
+		this.emailVerified = true;
+	}
+
+	public TwoFactorMethod getTwoFactorMethod() {
+		return twoFactorMethod;
+	}
+
+	public boolean isTwoFactorEnabled() {
+		return twoFactorMethod != null;
+	}
+
+	String getTotpSecret() {
+		return totpSecret;
+	}
+
+	/**
+	 * Turning 2FA on. The secret is required for TOTP and forbidden otherwise:
+	 * V2 enforces the first half as a check constraint, because a TOTP account
+	 * with no secret would demand a code nobody can generate - a permanent
+	 * lockout with no way back in.
+	 */
+	void enableTwoFactor(TwoFactorMethod method, String secret) {
+		if (method == TwoFactorMethod.TOTP && (secret == null || secret.isBlank())) {
+			throw new IllegalArgumentException("TOTP requires a secret");
+		}
+		this.twoFactorMethod = method;
+		this.totpSecret = (method == TwoFactorMethod.TOTP) ? secret : null;
+	}
+
+	/**
+	 * Stages a TOTP secret while setup is still unconfirmed.
+	 *
+	 * The method stays null, so 2FA remains OFF until a working code proves the
+	 * authenticator was actually set up. V2 permits exactly this state - its
+	 * constraint forbids a method of 'totp' without a secret, not the reverse.
+	 */
+	void stageTotpSecret(String secret) {
+		this.totpSecret = secret;
+	}
+
+	public void changePassword(String newPasswordHash) {
+		this.passwordHash = newPasswordHash;
+	}
+
+	/** Clears the secret too: keeping one after 2FA is off is a liability with no use. */
+	void disableTwoFactor() {
+		this.twoFactorMethod = null;
+		this.totpSecret = null;
 	}
 }

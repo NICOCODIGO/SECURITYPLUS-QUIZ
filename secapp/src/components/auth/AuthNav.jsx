@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut } from 'lucide-react';
+import { LogOut, ShieldAlert, UserCog } from 'lucide-react';
 import { useAuth } from '@/auth/AuthContext';
 
 /**
@@ -82,6 +82,19 @@ export default function AuthNav() {
             <p className="text-xs text-slate-500">Signed in as</p>
             <p className="text-sm font-bold text-comptia-charcoal truncate">{user?.email}</p>
           </div>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild className="gap-2 cursor-pointer">
+            <Link to="/account">
+              <UserCog className="w-4 h-4" />
+              Account settings
+              {/* The one nudge worth making visible: without a confirmed
+                  address there is no way to reset a forgotten password, and
+                  nobody goes looking for that setting until it is too late. */}
+              {user && user.emailVerified === false && (
+                <ShieldAlert className="w-4 h-4 ml-auto text-amber-600" aria-label="Email not confirmed" />
+              )}
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={signOut} className="gap-2 cursor-pointer">
             <LogOut className="w-4 h-4" />

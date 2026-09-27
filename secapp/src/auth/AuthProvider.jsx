@@ -90,8 +90,27 @@ export default function AuthProvider({ children }) {
     return session;
   }, []);
 
+  /**
+   * Resolves to `{ signedIn: true }` or `{ challenge, method }`.
+   *
+   * The challenge branch deliberately adopts nothing: there is no access token
+   * and no refresh cookie until the second step passes, so a caller holding
+   * only the password cannot read or write any study data.
+   */
   const signIn = useCallback(
-    async (email, password) => adopt(await authApi.login(email, password)),
+    async (email, password) => {
+      const result = await authApi.login(email, password);
+      if (result?.challenge) {
+        return { challenge: result.challenge, method: result.twoFactorMethod };
+      }
+      await adopt(result);
+      return { signedIn: true };
+    },
+    [adopt]
+  );
+
+  const completeTwoFactor = useCallback(
+    async (challenge, code) => adopt(await authApi.verifyTwoFactor(challenge, code)),
     [adopt]
   );
 
@@ -115,9 +134,20 @@ export default function AuthProvider({ children }) {
     setStatus('anonymous');
   }, []);
 
+  /**
+   * Lets the account page reflect a change — verifying an address, turning 2FA
+   * on — without a reload. `user` is what AuthNav and the account page read, so
+   * a stale copy shows the wrong state until the next refresh.
+   */
+  const refreshUser = useCallback(async () => {
+    const current = await authApi.me();
+    setUser(current);
+    return current;
+  }, []);
+
   const value = useMemo(
-    () => ({ status, user, signIn, signUp, signOut }),
-    [status, user, signIn, signUp, signOut]
+    () => ({ status, user, signIn, signUp, signOut, completeTwoFactor, refreshUser }),
+    [status, user, signIn, signUp, signOut, completeTwoFactor, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

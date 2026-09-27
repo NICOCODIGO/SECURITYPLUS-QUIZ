@@ -27,6 +27,10 @@ dependencies {
 	// manages both of these. A standalone JWT library would mean pinning a
 	// version the BOM does not manage and writing the filter ourselves.
 	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
+	// Verification links, password resets and emailed login codes, over SES
+	// SMTP. The BOM manages it, so no version to track - and SMTP means no AWS
+	// SDK, which this project has managed without so far.
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.flywaydb:flyway-database-postgresql'

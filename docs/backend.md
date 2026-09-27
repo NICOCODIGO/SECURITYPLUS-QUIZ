@@ -144,6 +144,59 @@ interrupted exam can be picked back up, on another device if need be. Grading ha
 simply because that is where the session already is. The key is withheld not as a security
 measure but because a mock reveals nothing until submit, so the client has no use for it.
 
+### Account security — ✅ built
+
+| Endpoint | Does |
+|---|---|
+| `POST /auth/2fa/verify` | Challenge + code → a session |
+| `POST /auth/verify-email` | Spends a verification link |
+| `POST /auth/resend-verification` | Authenticated; rate limited per account |
+| `POST /auth/forgot-password` | **Always 204** |
+| `POST /auth/reset-password` | New password; kills every refresh token |
+| `GET /auth/2fa` | Method in use, recovery codes left |
+| `POST /auth/2fa/setup` | Begins setup; TOTP secret is returned here, once |
+| `POST /auth/2fa/confirm` | Enables it; **the only response with recovery codes in the clear** |
+| `POST /auth/2fa/disable` | Needs the password, not just a session |
+| `POST /auth/2fa/recovery-codes` | Replaces the list; needs the password |
+
+The first four are **public**, because they are reached by someone who cannot sign in — that
+is the point of them. Each carries its own single-use, expiring token and its own rate limit.
+
+`verify-email` and `reset-password` are **POST, not GET**, even though both are reached from a
+link. The email links to the SPA, which then calls the API. A GET endpoint would be fetched by
+the link scanners some mail providers run, spending the token before the person ever clicked.
+
+## Two-step login
+
+With 2FA on, `POST /auth/login` stops returning a session:
+
+```jsonc
+// 2FA off
+{ "accessToken": "…", "expiresInSeconds": 900, "user": { … } }
+// 2FA on — no token, and no Set-Cookie
+{ "challenge": "…", "twoFactorMethod": "email" }
+```
+
+Three properties hold this together, and each fails silently if broken:
+
+- **The challenge carries nothing.** No access token, no refresh cookie. Someone holding only
+  the password gets a string that cannot read or write any study data.
+- **Resolved without being spent.** `UserTokenService.resolve` finds the account without
+  setting `used_at`, so one mistyped digit costs an attempt rather than sending the person back
+  to the password screen. Only a correct code redeems it.
+- **Rate limited per challenge, not only per IP.** Six digits is a million values. An attacker
+  who already has the password can rotate source addresses, so a per-IP bucket alone would not
+  stop them. `LoginRateLimiter.TWO_FACTOR_PER_CHALLENGE` is 5.
+
+Recovery codes are accepted wherever a code is, in the same field. The server can tell them
+apart by shape, and asking someone mid-lockout to first classify what they are holding is
+friction that buys nothing.
+
+**Verification gates password reset and nothing else.** An unverified address gets no reset
+link — otherwise registering someone else's address would be a way to take over a mailbox you
+never proved you owned. It must never gate *studying*: every quiz works signed out, so gating
+it signed in would be a strict downgrade for having made an account.
+
 ## Auth design
 
 Own implementation, not Cognito.
@@ -153,8 +206,14 @@ Own implementation, not Cognito.
 - Short-lived access JWT (~15 min).
 - **Rotating** refresh token in an httpOnly `SameSite=Strict` cookie. Only the SHA-256 of a
   token is stored, so a database leak hands out no live sessions.
-- Rate limiting on login, register and refresh. In-memory and per-instance, deliberately —
-  see [decisions.md](decisions.md).
+- Rate limiting on login, register, refresh, password reset and **per 2FA challenge**.
+  In-memory and per-instance, deliberately — see [decisions.md](decisions.md).
+- Optional 2FA: emailed six-digit codes, or RFC 6238 TOTP written against the JDK. Ten
+  single-use recovery codes, hashed, shown once.
+- Mail over SES SMTP. **Sending never fails the request that triggered it** — `Mailer` logs and
+  swallows, because a registration that 500s over an SMTP hiccup is worse than a late email.
+  With `MAIL_HOST` unset it logs what it would have sent, so the whole flow is walkable from a
+  clean checkout with no SES account and no network.
 - No JWT library. The Boot BOM's `spring-boot-starter-security-oauth2-resource-server`
   provides `JwtEncoder`/`JwtDecoder` and bearer authentication, so there is no hand-written
   filter and no version to track.

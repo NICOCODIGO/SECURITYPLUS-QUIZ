@@ -52,18 +52,41 @@ public class AuthService {
 
 	private final LoginRateLimiter rateLimiter;
 
+	private final UserTokenService userTokens;
+
+	private final RecoveryCodeService recoveryCodes;
+
+	private final AccountSecurityService accountSecurity;
+
 	AuthService(UserRepository users, RefreshTokenService refreshTokens, TokenService tokens,
-			PasswordEncoder passwords, LoginRateLimiter rateLimiter) {
+			PasswordEncoder passwords, LoginRateLimiter rateLimiter, UserTokenService userTokens,
+			RecoveryCodeService recoveryCodes, AccountSecurityService accountSecurity) {
 		this.users = users;
 		this.refreshTokens = refreshTokens;
 		this.tokens = tokens;
 		this.passwords = passwords;
 		this.rateLimiter = rateLimiter;
+		this.userTokens = userTokens;
+		this.recoveryCodes = recoveryCodes;
+		this.accountSecurity = accountSecurity;
 		this.dummyHash = passwords.encode(UUID.randomUUID().toString());
 	}
 
 	/** An access token plus the raw refresh value the controller turns into a cookie. */
 	record Session(SessionView view, RefreshTokenService.Issued refreshToken) {
+	}
+
+	/**
+	 * Login ends in one of two places: signed in, or owing a second step.
+	 *
+	 * A challenge carries no access token and no cookie, so an attacker holding
+	 * only the password gets a string that cannot read or write anything.
+	 */
+	record LoginOutcome(Session session, String challenge, TwoFactorMethod method) {
+
+		boolean needsSecondStep() {
+			return challenge != null;
+		}
 	}
 
 	/**
@@ -86,15 +109,26 @@ public class AuthService {
 			throw new AuthException(HttpStatus.CONFLICT, "That email is already registered.");
 		}
 
-		User user = users.save(User.create(request.email(), passwords.encode(request.password()),
-				request.displayName()));
+		// saveAndFlush, not save. UserTokenService writes through JdbcClient, which
+		// does not see unflushed JPA state — so with a plain save, the row this
+		// user_tokens insert points at does not exist yet and the foreign key
+		// fails. It surfaces as a 500 on EVERY registration, and only once a
+		// verification token is issued in the same transaction, which is why it
+		// appeared the moment mail was added rather than when the entity changed.
+		User user = users.saveAndFlush(User.create(request.email(),
+				passwords.encode(request.password()), request.displayName()));
 		user.recordLogin(now);
+
+		// Best-effort and deliberately so: Mailer swallows its own failures, so a
+		// registration never fails because SMTP did. The address can be confirmed
+		// later from the account page.
+		accountSecurity.sendVerification(user, now);
 
 		return session(user, now, userAgent);
 	}
 
 	@Transactional
-	Session login(LoginRequest request, Instant now, String ip, String userAgent) {
+	LoginOutcome login(LoginRequest request, Instant now, String ip, String userAgent) {
 		rateLimiter.check("login:ip:" + ip, LoginRateLimiter.LOGIN_PER_IP, LoginRateLimiter.LOGIN_WINDOW, now);
 		String emailKey = "login:email:" + request.email().toLowerCase();
 		rateLimiter.check(emailKey, LoginRateLimiter.LOGIN_PER_EMAIL, LoginRateLimiter.LOGIN_WINDOW, now);
@@ -114,8 +148,83 @@ public class AuthService {
 
 		// Only failures should count towards the lockout.
 		rateLimiter.clear(emailKey);
+
+		if (user.isTwoFactorEnabled()) {
+			// The password was right, so the lockout is cleared above - but
+			// nothing is issued yet. Until the second step passes this account
+			// is no more signed in than before.
+			UserTokenService.Issued challenge = userTokens.issueLink(user.getId(),
+					UserTokenService.LOGIN_CHALLENGE, UserTokenService.CHALLENGE_TTL, now);
+
+			if (user.getTwoFactorMethod() == TwoFactorMethod.EMAIL) {
+				// Not thrown, deliberately. Over the limit we skip ISSUING as well
+				// as sending, which leaves the code already in their inbox valid -
+				// issuing is what invalidates the previous one. So the sign-in
+				// still works, it just does not generate another email. Refusing
+				// here would turn a rate limit into a lockout.
+				if (rateLimiter.tryAcquire("2fa:send:" + user.getId(),
+						LoginRateLimiter.LOGIN_CODE_SEND_PER_USER,
+						LoginRateLimiter.LOGIN_CODE_SEND_WINDOW, now)) {
+					accountSecurity.sendLoginCode(user, now);
+				}
+			}
+			return new LoginOutcome(null, challenge.value(), user.getTwoFactorMethod());
+		}
+
+		user.recordLogin(now);
+		return new LoginOutcome(session(user, now, userAgent), null, null);
+	}
+
+	/**
+	 * The second step: challenge plus code, in exchange for a session.
+	 *
+	 * The challenge is resolved without being spent, so a mistyped digit costs
+	 * one attempt rather than sending the person back to the password screen.
+	 * Only a correct code consumes it.
+	 *
+	 * Rate limited **per challenge**, not only per IP. Six digits is a million
+	 * values; an attacker who already has the password can rotate addresses, so
+	 * a per-IP bucket alone would not stop them.
+	 */
+	@Transactional
+	Session verifyTwoFactor(String challenge, String code, Instant now, String ip, String userAgent) {
+		rateLimiter.check("2fa:ip:" + ip, LoginRateLimiter.LOGIN_PER_IP, LoginRateLimiter.LOGIN_WINDOW, now);
+
+		UUID userId = userTokens.resolve(challenge, UserTokenService.LOGIN_CHALLENGE, now)
+			.orElseThrow(() -> new AuthException(HttpStatus.UNAUTHORIZED,
+					"That sign-in attempt has expired. Start again."));
+
+		rateLimiter.check("2fa:challenge:" + userId, LoginRateLimiter.TWO_FACTOR_PER_CHALLENGE,
+				LoginRateLimiter.TWO_FACTOR_WINDOW, now);
+
+		User user = users.findById(userId)
+			.orElseThrow(() -> new AuthException(HttpStatus.UNAUTHORIZED, BAD_CREDENTIALS));
+
+		if (!codeAccepted(user, code, now)) {
+			throw new AuthException(HttpStatus.UNAUTHORIZED, "That code is not right, or it has expired.");
+		}
+
+		// Correct: spend the challenge so it cannot be replayed, and stop
+		// counting attempts against it.
+		userTokens.redeem(challenge, UserTokenService.LOGIN_CHALLENGE, now);
+		rateLimiter.clear("2fa:challenge:" + userId);
 		user.recordLogin(now);
 		return session(user, now, userAgent);
+	}
+
+	/**
+	 * The configured method first, then recovery codes.
+	 *
+	 * One input field for both: the server can tell a six-digit code from a
+	 * recovery code by shape, and asking someone mid-lockout to first classify
+	 * what they are holding is friction that buys nothing.
+	 */
+	private boolean codeAccepted(User user, String code, Instant now) {
+		boolean primary = (user.getTwoFactorMethod() == TwoFactorMethod.TOTP)
+				? Totp.verify(user.getTotpSecret(), code, now)
+				: userTokens.redeemLoginCode(user.getId(), code, now);
+
+		return primary || recoveryCodes.redeem(user.getId(), code, now);
 	}
 
 	@Transactional

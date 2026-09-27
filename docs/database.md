@@ -62,11 +62,38 @@ covered by `questions.explanation` instead.
 ### People
 
 **`users`** — `id` uuid PK, `email`, `password_hash`, `display_name`, `role`
-(`USER`/`ADMIN`), timestamps. `display_name` is only ever shown back to its owner — there is
+(`USER`/`ADMIN`), `email_verified`, `two_factor_method`, `totp_secret`, timestamps.
+
+`two_factor_method` is nullable and constrained to `('email','totp')`; **null means 2FA is
+off**. One nullable column rather than a boolean plus a method, so "on, but by which means"
+stays a single answerable question instead of two flags that can contradict.
+
+A check constraint forbids `two_factor_method = 'totp'` without a secret — that state would
+demand a code nobody can generate, which is a permanent lockout. The reverse *is* allowed and
+is load-bearing: a secret with no method is a setup that has been started but not yet confirmed
+by a working code.
+
+V2 grandfathers every pre-existing account as verified. They were created when there was
+nothing to verify, and a migration whose effect is to lock out every existing user is not a
+migration. `display_name` is only ever shown back to its owner — there is
 no public profile and no cross-user visibility anywhere in this schema.
 
 **`refresh_tokens`** — `user_id` → `users` (cascade), `token_hash` unique, `expires_at`,
 `revoked_at`, `user_agent`. Only the SHA-256 of a token is stored.
+
+**`user_tokens`** — verification links, reset links, emailed login codes and login challenges,
+separated by `purpose`. Only the SHA-256 is stored; `used_at` marks a token spent rather than
+deleting the row, so a link presented twice is recognised as *spent* instead of merely unknown.
+
+One table for all four because they differ only in what redeeming them does — the `purpose`
+check constraint is what stops a reset token being spent on verification.
+
+**Login codes are hashed scoped to the user** (`<user id>:<code>`), never bare. Six digits is
+only a million values against a `unique` column, so two people can hold the same code at once —
+and a lookup by the bare hash would let one account spend another's.
+
+**`recovery_codes`** — PK `(user_id, code_hash)`, `used_at`. Hashed because each one alone gets
+past 2FA, which makes them password-equivalent.
 
 ### Attempts
 

@@ -31,4 +31,36 @@ public final class AuthRequests {
 	 */
 	public record LoginRequest(@NotBlank String email, @NotBlank String password) {
 	}
+
+	/**
+	 * The second step. `code` is a six-digit code OR a recovery code - one field,
+	 * because making the person first classify what they are holding is friction
+	 * that buys nothing; the server can tell by shape.
+	 */
+	public record TwoFactorVerifyRequest(@NotBlank String challenge, @NotBlank @Size(max = 32) String code) {
+	}
+
+	public record VerifyEmailRequest(@NotBlank String token) {
+	}
+
+	public record ForgotPasswordRequest(@NotBlank @Email @Size(max = 320) String email) {
+	}
+
+	/**
+	 * Same 10..72 bound as registration, and for the same reason: BCrypt
+	 * truncates at 72 bytes, so a longer passphrase would be silently cut and
+	 * two different passwords would open the account.
+	 */
+	public record ResetPasswordRequest(@NotBlank String token, @NotBlank @Size(min = 10, max = 72) String password) {
+	}
+
+	public record TwoFactorSetupRequest(@NotBlank String method) {
+	}
+
+	public record TwoFactorConfirmRequest(@NotBlank String method, @NotBlank @Size(max = 32) String code) {
+	}
+
+	/** Turning 2FA off, or reissuing recovery codes, costs the password. */
+	public record PasswordConfirmRequest(@NotBlank String password) {
+	}
 }

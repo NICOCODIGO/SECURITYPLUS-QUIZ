@@ -41,6 +41,21 @@ data "aws_cloudfront_origin_request_policy" "all_viewer_except_host" {
   name = "Managed-AllViewerExceptHostHeader"
 }
 
+# --------------------------------------------------------------- functions --
+
+# Attached to the SPA behaviour only, deliberately. A 301 tells the browser to
+# reissue the request, and a browser reissuing a POST drops the body - so
+# redirecting /api/* would break every sign-in and quiz submission sent to www
+# in a way that looks like the API silently losing data. Pages redirect, the SPA
+# therefore always runs on the apex, and its own API calls go there too.
+resource "aws_cloudfront_function" "redirect_to_apex" {
+  name    = "${local.name}-redirect-to-apex"
+  runtime = "cloudfront-js-2.0"
+  publish = true
+  comment = "Sends www.${var.domain_name} to the apex, so session cookies have one host"
+  code    = templatefile("${path.module}/functions/redirect-to-apex.js", { apex = var.domain_name })
+}
+
 # ------------------------------------------------------------- distribution --
 
 resource "aws_cloudfront_distribution" "site" {
@@ -48,6 +63,11 @@ resource "aws_cloudfront_distribution" "site" {
   default_root_object = "index.html"
   price_class         = "PriceClass_100" # NA + EU; the cheapest tier
   comment             = "${local.name} — SPA and API on one domain"
+
+  # The apex is canonical; www is aliased only so the function below can redirect
+  # it. An alias CloudFront does not know about is answered with 403, so both
+  # names have to be listed even though one only ever redirects.
+  aliases = [var.domain_name, "www.${var.domain_name}"]
 
   origin {
     origin_id                = "s3"
@@ -75,6 +95,11 @@ resource "aws_cloudfront_distribution" "site" {
     cached_methods         = ["GET", "HEAD"]
     cache_policy_id        = data.aws_cloudfront_cache_policy.caching_optimized.id
     compress               = true
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.redirect_to_apex.arn
+    }
   }
 
   # The API. Three things here are load-bearing and each fails silently if wrong.
@@ -127,7 +152,11 @@ resource "aws_cloudfront_distribution" "site" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    acm_certificate_arn = aws_acm_certificate_validation.site.certificate_arn
+    # sni-only is required with a custom certificate. The alternative dedicates
+    # an IP address per distribution and bills hundreds of dollars a month.
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
   }
 }
 

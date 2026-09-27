@@ -21,26 +21,49 @@ const safeNext = (value) =>
 
 export default function AuthForm({ mode }) {
   const isSignUp = mode === 'signup';
-  const { status, signIn, signUp } = useAuth();
+  const { status, signIn, signUp, completeTwoFactor } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  // Set only when the account has a second step. Holding it here rather than
+  // in a route keeps it out of the URL and out of history.
+  const [challenge, setChallenge] = useState(null);
+  const [method, setMethod] = useState(null);
+  const [code, setCode] = useState('');
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError(null);
     setBusy(true);
 
+    // Caught here rather than by the server, so the message can point at the
+    // field that is wrong instead of rejecting the whole form.
+    if (isSignUp && password !== confirmPassword) {
+      setError('Those passwords do not match.');
+      setBusy(false);
+      return;
+    }
+
     try {
       if (isSignUp) {
         await signUp(email, password, displayName.trim() || null);
       } else {
-        await signIn(email, password);
+        const result = await signIn(email, password);
+        if (result?.challenge) {
+          // Right password, but not signed in yet - and deliberately holding
+          // nothing that could read or write study data until the code lands.
+          setChallenge(result.challenge);
+          setMethod(result.method);
+          setBusy(false);
+          return;
+        }
       }
       navigate(safeNext(params.get('next')), { replace: true });
     } catch (submitError) {
@@ -54,6 +77,25 @@ export default function AuthForm({ mode }) {
           : submitError?.message?.replace(/^API \d+: /, '') || 'Something went wrong.'
       );
       setBusy(false);
+    }
+  };
+
+  const handleVerify = async (event) => {
+    event.preventDefault();
+    setError(null);
+    setBusy(true);
+
+    try {
+      await completeTwoFactor(challenge, code.trim());
+      navigate(safeNext(params.get('next')), { replace: true });
+    } catch (verifyError) {
+      setError(
+        verifyError?.isOffline
+          ? 'Cannot reach the server. Check your connection and try again.'
+          : verifyError?.message?.replace(/^API \d+: /, '') || 'Something went wrong.'
+      );
+      setBusy(false);
+      setCode('');
     }
   };
 
@@ -74,6 +116,80 @@ export default function AuthForm({ mode }) {
             Go to Practice
           </Button>
         </Link>
+      </div>
+    );
+  }
+
+  if (challenge) {
+    return (
+      <div className="max-w-md mx-auto py-10 px-4">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-red-600">One more step</p>
+        <h1 className="text-3xl font-black text-comptia-charcoal mt-1">Enter your code</h1>
+        <p className="text-slate-600 mt-2">
+          {method === 'totp'
+            ? 'Open your authenticator app and enter the six-digit code it shows.'
+            : `We sent a six-digit code to ${email}. It expires in ten minutes.`}
+        </p>
+
+        <Card className="border border-slate-200 shadow-sm mt-6">
+          <CardContent className="p-6">
+            <form onSubmit={handleVerify} className="space-y-4" noValidate>
+              {error && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2.5 text-sm text-red-900"
+                >
+                  <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label htmlFor="code" className="font-bold text-comptia-charcoal">
+                  Code
+                </Label>
+                <Input
+                  id="code"
+                  type="text"
+                  inputMode="text"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  required
+                  maxLength={32}
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  className="text-lg tracking-[0.3em] font-mono"
+                />
+                <p className="text-xs text-slate-500">
+                  Lost your device? Enter one of your recovery codes instead.
+                </p>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={busy}
+                className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-6 gap-2"
+              >
+                {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+                Verify and sign in
+              </Button>
+            </form>
+
+            <p className="text-sm text-slate-600 text-center mt-5">
+              <button
+                type="button"
+                onClick={() => {
+                  setChallenge(null);
+                  setCode('');
+                  setError(null);
+                }}
+                className="font-bold text-red-600 hover:text-red-700 underline"
+              >
+                Start over
+              </button>
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -158,6 +274,23 @@ export default function AuthForm({ mode }) {
               )}
             </div>
 
+            {isSignUp && (
+              <div className="space-y-1.5">
+                <Label htmlFor="confirmPassword" className="font-bold text-comptia-charcoal">
+                  Confirm password
+                </Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  maxLength={MAX_PASSWORD}
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                />
+              </div>
+            )}
+
             <Button
               type="submit"
               disabled={busy}
@@ -167,6 +300,14 @@ export default function AuthForm({ mode }) {
               {isSignUp ? 'Create free account' : 'Sign in'}
             </Button>
           </form>
+
+          {!isSignUp && (
+            <p className="text-sm text-center mt-4">
+              <Link to="/forgot-password" className="text-slate-600 hover:text-red-600 underline">
+                Forgot your password?
+              </Link>
+            </p>
+          )}
 
           <p className="text-sm text-slate-600 text-center mt-5">
             {isSignUp ? 'Already have an account? ' : "Don't have an account? "}

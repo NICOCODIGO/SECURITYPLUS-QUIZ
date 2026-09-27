@@ -5,9 +5,21 @@ variable "project" {
 }
 
 variable "region" {
-  description = "Everything lives in one region. CloudFront is global but its ACM cert, if a custom domain is ever added, must be in us-east-1."
+  description = "Everything lives in one region. CloudFront is global, and its ACM certificate MUST be in us-east-1 - which is why dns.tf needs no second provider alias."
   type        = string
   default     = "us-east-1"
+}
+
+variable "domain_name" {
+  description = <<-EOT
+    The registered domain the app is served from. Route 53 created its hosted
+    zone at registration, so dns.tf reads that zone rather than creating one.
+
+    Everything else is derived: www.<domain> redirects to the apex, mail.<domain>
+    is the SES custom MAIL FROM, and the ACM certificate covers apex + www.
+  EOT
+  type        = string
+  default     = "certucation.click"
 }
 
 variable "db_username" {
@@ -51,6 +63,19 @@ variable "site_url" {
   EOT
   type        = string
   default     = "https://placeholder.invalid"
+}
+
+variable "mail_from" {
+  description = <<-EOT
+    The sender address. Verifying the DOMAIN authorises every address on it, so
+    this one needs no separate verification - which is the main reason dns.tf
+    creates a domain identity instead of another single-address one.
+
+    Do not point this at the domain before SES reports it verified: sending would
+    fail for every recipient, including the one verified address.
+  EOT
+  type        = string
+  default     = "noreply@certucation.click"
 }
 
 variable "image_tag" {

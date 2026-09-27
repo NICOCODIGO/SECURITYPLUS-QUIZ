@@ -76,6 +76,8 @@ data "aws_iam_policy_document" "read_secrets" {
       aws_ssm_parameter.db_user.arn,
       aws_ssm_parameter.db_password.arn,
       aws_ssm_parameter.jwt_secret.arn,
+      aws_ssm_parameter.mail_username.arn,
+      aws_ssm_parameter.mail_password.arn,
     ]
   }
 }
@@ -122,6 +124,15 @@ resource "aws_apprunner_service" "api" {
           # rather than read from the distribution — see variables.tf for why
           # that would be a cycle.
           CORS_ALLOWED_ORIGINS = var.site_url
+
+          # SES SMTP in the same region. Port 587 with STARTTLS rather than 465
+          # implicit TLS, because that is what JavaMailSender defaults to.
+          MAIL_HOST = "email-smtp.${var.region}.amazonaws.com"
+          MAIL_PORT = "587"
+          MAIL_FROM = var.mail_from
+          # Links in verification and reset emails have to point at the site,
+          # not at App Runner directly.
+          APP_BASE_URL = var.site_url
         }
 
         runtime_environment_secrets = {
@@ -129,6 +140,8 @@ resource "aws_apprunner_service" "api" {
           DB_USER         = aws_ssm_parameter.db_user.arn
           DB_PASSWORD     = aws_ssm_parameter.db_password.arn
           AUTH_JWT_SECRET = aws_ssm_parameter.jwt_secret.arn
+          MAIL_USERNAME   = aws_ssm_parameter.mail_username.arn
+          MAIL_PASSWORD   = aws_ssm_parameter.mail_password.arn
         }
       }
     }

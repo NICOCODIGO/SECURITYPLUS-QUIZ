@@ -140,27 +140,32 @@ export default function Progress() {
         // Not "no results yet" — there is no data because none is kept while
         // signed out, and saying the other thing would be untrue.
         <ProgressGate />
-      ) : !hasHistory ? (
-        // One clear call to action beats a grid of empty panels.
-        <Card className="border border-slate-200 shadow-sm">
-          <CardContent className="p-12 text-center space-y-4">
-            <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mx-auto shadow-lg">
-              <Target className="w-8 h-8 text-white" />
-            </div>
-            <h2 className="text-2xl font-black text-comptia-charcoal">No quiz results yet</h2>
-            <p className="text-slate-600 max-w-lg mx-auto">
-              Take a domain quiz or a mock exam and this dashboard fills in — accuracy per domain, your score trend,
-              and the questions you keep getting wrong.
-            </p>
-            <Link to="/lessons" className="inline-block">
-              <Button className="bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-6 rounded-lg inline-flex items-center gap-2">
-                Take your first quiz
-                <ArrowRight className="w-5 h-5" />
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
       ) : (
+        <>
+        {/* The panels render whether or not there is data: each one says what it
+            will show once there is, which tells a new visitor what the
+            dashboard is for far better than a single card describing it.
+            Replacing them with one call to action was the earlier choice and it
+            hid the whole feature from anyone who had not taken a quiz yet. */}
+        {!hasHistory && (
+          <Card className="border border-slate-200 shadow-sm">
+            <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="w-10 h-10 shrink-0 bg-red-600 rounded-full flex items-center justify-center">
+                <Target className="w-5 h-5 text-white" />
+              </div>
+              <p className="text-slate-600 flex-1">
+                <span className="font-bold text-comptia-charcoal">Nothing recorded yet.</span>{' '}
+                Take a quiz and every panel below fills in.
+              </p>
+              <Link to="/lessons" className="shrink-0">
+                <Button className="bg-red-600 hover:bg-red-700 text-white font-bold gap-2">
+                  Take your first quiz
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           <ScoreTrendChart trend={trend} className="lg:col-span-8" />
           {/* Readiness has the column to itself. Strongest / weakest domain
@@ -174,6 +179,7 @@ export default function Progress() {
           <MostMissedPanel missed={missed} hasHistory={hasHistory} className="lg:col-span-7" />
           <RecentActivityPanel attempts={attempts} className="lg:col-span-5" />
         </div>
+        </>
       )}
     </div>
   );

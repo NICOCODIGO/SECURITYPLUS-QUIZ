@@ -4,7 +4,7 @@ A free study platform for the **CompTIA Security+ (SY0-701)** exam: lessons, dom
 a full 90-question mock exam, a custom quiz builder, Question of the Day, and a progress
 dashboard.
 
-**Live: https://d1cl3du8tc9284.cloudfront.net**
+**Live: https://certucation.click**
 
 > **Status:** deployed and working. React front end on S3 + CloudFront, Spring Boot API on App
 > Runner, PostgreSQL on RDS, accounts with rotating refresh tokens, and quiz history that

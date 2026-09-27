@@ -69,7 +69,13 @@ public class SecurityConfig {
 				// with an expired one more often than not. /auth/me is the only
 				// one that falls through to authenticated().
 				.requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login",
-						"/api/v1/auth/refresh", "/api/v1/auth/logout")
+						"/api/v1/auth/refresh", "/api/v1/auth/logout",
+						// All four below are reached by someone who cannot sign in
+						// yet - that is the entire point of them. Each carries its
+						// own single-use, expiring token and its own rate limit;
+						// public is not the same as unprotected.
+						"/api/v1/auth/2fa/verify", "/api/v1/auth/verify-email",
+						"/api/v1/auth/forgot-password", "/api/v1/auth/reset-password")
 					.permitAll()
 				// Liveness and readiness only. `management.endpoint.health.show-details`
 				// is `when-authorized`, so anonymous callers get UP/DOWN and nothing

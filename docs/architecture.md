@@ -8,7 +8,7 @@ A free study platform for the CompTIA Security+ **SY0-701** exam: lessons, domai
 a 90-question mock exam, a custom quiz builder, Question of the Day, and a progress
 dashboard.
 
-**Live at https://d1cl3du8tc9284.cloudfront.net.** The front end is complete, the API serves
+**Live at https://certucation.click.** The front end is complete, the API serves
 the question bank and **has accounts** — register, login, rotating refresh, logout, me — and
 the whole stack is deployed on AWS.
 
@@ -102,7 +102,7 @@ Each phase ends with the app fully working, deployed or not.
 - **4 — Resumable mock exams.** DynamoDB session lifecycle, keyless question delivery,
   blueprint-weighted draw, submit + review payload.
 - **5 — ~~Leaderboard~~. Cut.** See [decisions.md](decisions.md).
-- **6 — Deploy.** ✅ Done. **Live at https://d1cl3du8tc9284.cloudfront.net.** Terraform in
+- **6 — Deploy.** ✅ Done. **Live at https://certucation.click.** Terraform in
   `infra/`, shipped by `./scripts/deploy.sh`; S3 + CloudFront, ECR → App Runner, RDS
   `t4g.micro` in a private subnet, secrets in SSM, state in S3. One distribution serves both
   the site and `/api/*` — required, not tidy: the `SameSite=Strict` refresh cookie is never

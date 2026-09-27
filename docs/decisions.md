@@ -75,6 +75,36 @@ Still on the page and needing care:
 | Java 21 | Java 25 — the installed LTS; pinning to 21 forces a second toolchain download |
 | `citext` extension | A `lower(email)` unique index, so the schema runs on stock RDS |
 
+## Account security
+
+**TOTP written against the JDK, not a library.** RFC 6238 is an HMAC, a counter and a
+truncation — about 60 lines. A dependency would be a version to track and a supply-chain
+surface, for code that cannot change. `TotpTests` runs the RFC's own published vectors
+(287082, 081804, 050471, 005924, 279037), which is a stronger guarantee than "a popular
+package".
+
+**Both 2FA methods, not just one.** Email alone fails exactly when the mailbox is the thing
+that is lost; TOTP alone excludes anyone unwilling to install an authenticator. Neither is
+strictly better, so the account chooses.
+
+**2FA is optional, and stays optional until SES has production access.** Requiring a second
+factor while password reset can only reach one verified address would mean a lost authenticator
+is a lost account, with no channel to recover through. The order matters: working recovery
+first, then requirements.
+
+**Mail is best-effort, never blocking.** `Mailer` catches and logs rather than throwing. A
+registration that returns 500 because SMTP hiccuped is worse than one whose verification email
+is late — the account exists either way, and every mail has a resend path. In the SES sandbox,
+sending to an unverified address failing is the *everyday* case, and it must not break
+registration.
+
+**Recovery codes are shown exactly once.** They are hashed at rest, so there is no endpoint
+that can show them again — only one that replaces them. That is why the UI blocks on
+acknowledging them instead of offering a dismissable notice.
+
+**Turning 2FA off costs the password, not just a session.** A borrowed unlocked laptop is
+precisely the threat 2FA exists for, and it arrives holding a valid session.
+
 ## Deliberately deferred
 
 Not bugs. Known, chosen, and waiting.

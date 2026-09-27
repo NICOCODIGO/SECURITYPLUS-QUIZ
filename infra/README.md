@@ -7,10 +7,28 @@ you only mean to change infrastructure.
 ## What it creates
 
 ```
-CloudFront ──┬── /*      → S3 (the React app)
-             └── /api/*  → App Runner (Spring Boot) ── VPC connector ── RDS Postgres 17
-                                                                    └── SSM (secrets)
+certucation.click ── CloudFront ──┬── /*      → S3 (the React app)
+    (www → apex)                  └── /api/*  → App Runner (Spring Boot)
+                                                    ├── VPC connector ── RDS Postgres 17
+                                                    └── SSM (secrets)
+
+Route 53 ── ACM certificate (us-east-1) + SES domain identity, DKIM, custom MAIL FROM
 ```
+
+| File | Holds |
+|---|---|
+| `main.tf` | Providers, the S3 state backend, shared locals |
+| `network.tf` | VPC, subnets, the App Runner VPC connector |
+| `database.tf` | RDS Postgres, its generated password, the SSM parameters |
+| `api.tf` | ECR, the two App Runner IAM roles, the service itself |
+| `web.tf` | S3, the distribution, the `www` → apex function |
+| `dns.tf` | The hosted zone lookup, every DNS record, the certificate, the SES identity |
+| `mail.tf` | The SES SMTP user and its derived password |
+| `functions/` | CloudFront Function source, rendered with `templatefile` |
+
+Standing up a **new** domain is the one case where `terraform apply -target=...` is correct, and
+[docs/devops.md](../docs/devops.md) has the exact command. Everything in `dns.tf` that waits polls
+public DNS, so certificate validation cannot pass until the registry has delegated the domain.
 
 ## The three things that will bite you
 
@@ -19,6 +37,10 @@ own domain and browsers will never send it — refresh fails forever and every u
 15 minutes after signing in. Local development cannot reveal this, because `localhost:5173` and
 `localhost:8080` are the same site. That is why `/api/*` is a CloudFront behaviour rather than a
 separate distribution.
+
+The custom domain kept that property rather than breaking it. `www` is aliased on the distribution
+only so a CloudFront Function can 301 it to the apex — cookies are scoped per host, so two
+serving hostnames would mean signing in on one and appearing signed out on the other.
 
 **The `/api/*` behaviour's policies are load-bearing.** It uses `Managed-CachingDisabled` and
 `Managed-AllViewerExceptHostHeader`. Defaults would strip `Authorization` and `Cookie` (so every

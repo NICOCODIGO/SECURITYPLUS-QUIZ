@@ -13,6 +13,10 @@ import TakeQuiz from './pages/TakeQuiz';
 import DailyQuestion from './pages/DailyQuestion';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import VerifyEmail from './pages/VerifyEmail';
+import Account from './pages/Account';
 import AuthProvider from './auth/AuthProvider';
 
 export default function App() {
@@ -135,6 +139,46 @@ export default function App() {
           element={
             <Layout currentPageName="SignUp">
               <SignUp />
+            </Layout>
+          }
+        />
+
+        {/* Account recovery. All three are reached by someone who cannot sign
+            in - that is the point of them - so none sits behind the session. */}
+        <Route
+          path="/forgot-password"
+          element={
+            <Layout currentPageName="ForgotPassword">
+              <ForgotPassword />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/reset-password"
+          element={
+            <Layout currentPageName="ResetPassword">
+              <ResetPassword />
+            </Layout>
+          }
+        />
+
+        {/* Where the emailed link lands. The page spends the token, so a mail
+            scanner prefetching the link cannot. */}
+        <Route
+          path="/verify-email"
+          element={
+            <Layout currentPageName="VerifyEmail">
+              <VerifyEmail />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/account"
+          element={
+            <Layout currentPageName="Account">
+              <Account />
             </Layout>
           }
         />

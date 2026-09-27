@@ -10,7 +10,7 @@ on demand — read the one or two files your task needs rather than everything.
 Free study platform for the CompTIA Security+ SY0-701 exam. Front end: React 19 + Vite 7 +
 Tailwind 3 + shadcn/ui, plain **JSX, not TypeScript** (`secapp/`). Back end: Java 25 +
 Spring Boot 4.1 + PostgreSQL (`server/`). **Deployed and live at
-https://d1cl3du8tc9284.cloudfront.net** — question bank and accounts are built; cross-device
+https://certucation.click** — question bank and accounts are built; cross-device
 sync (phase 3) and resumable mock exams (phase 4, the only thing DynamoDB is for) are not.
 
 ## Read this first

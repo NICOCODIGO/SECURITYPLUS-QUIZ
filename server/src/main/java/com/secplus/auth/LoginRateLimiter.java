@@ -42,11 +42,49 @@ public class LoginRateLimiter {
 
 	static final int REFRESH_PER_IP = 60;
 
+	/**
+	 * The one that actually matters.
+	 *
+	 * A six-digit code is a million guesses, which a script exhausts in minutes
+	 * if it is only limited per IP - and an attacker holding a valid password
+	 * already has the challenge. Five attempts against a single challenge makes
+	 * guessing hopeless while leaving room for a fat-fingered retype.
+	 */
+	static final int TWO_FACTOR_PER_CHALLENGE = 5;
+
+	/** Mail costs money to send and attention to receive. */
+	static final int VERIFY_SEND_PER_USER = 5;
+
+	/**
+	 * How many sign-in codes one account can have MAILED in a window.
+	 *
+	 * Distinct from TWO_FACTOR_PER_CHALLENGE, which caps *guesses*. This caps
+	 * *sends*: every login with the right password would otherwise mail a fresh
+	 * code, and a correct password clears the per-account login bucket, so
+	 * someone holding the password could use the account as a way to send mail
+	 * to its owner.
+	 *
+	 * Three is enough for a code that landed in spam plus a genuine retry.
+	 */
+	static final int LOGIN_CODE_SEND_PER_USER = 3;
+
+	static final int FORGOT_PER_IP = 10;
+
 	static final Duration LOGIN_WINDOW = Duration.ofMinutes(15);
 
 	static final Duration REGISTER_WINDOW = Duration.ofHours(1);
 
 	static final Duration REFRESH_WINDOW = Duration.ofMinutes(1);
+
+	/** Matches the login code's own ten-minute life; a longer window would outlive the code. */
+	static final Duration TWO_FACTOR_WINDOW = Duration.ofMinutes(10);
+
+	static final Duration VERIFY_SEND_WINDOW = Duration.ofHours(1);
+
+	/** Matches the code's own ten-minute life. */
+	static final Duration LOGIN_CODE_SEND_WINDOW = Duration.ofMinutes(10);
+
+	static final Duration FORGOT_WINDOW = Duration.ofHours(1);
 
 	private final Map<String, Window> windows = new ConcurrentHashMap<>();
 
@@ -77,6 +115,24 @@ public class LoginRateLimiter {
 				throw new RateLimitedException(retryAfter);
 			}
 			current.count += 1;
+		}
+	}
+
+	/**
+	 * Records a hit and reports whether it was allowed, instead of throwing.
+	 *
+	 * For limits where refusing outright would be worse than the thing being
+	 * limited. Mailing a sign-in code is the case this exists for: throwing 429
+	 * there would turn "we already sent you one" into "you cannot sign in",
+	 * converting a rate limit into a lockout.
+	 */
+	boolean tryAcquire(String key, int limit, Duration window, Instant now) {
+		try {
+			check(key, limit, window, now);
+			return true;
+		}
+		catch (RateLimitedException e) {
+			return false;
 		}
 	}
 

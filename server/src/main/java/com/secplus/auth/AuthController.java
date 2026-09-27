@@ -20,9 +20,20 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.secplus.auth.AuthRequests.ForgotPasswordRequest;
 import com.secplus.auth.AuthRequests.LoginRequest;
+import com.secplus.auth.AuthRequests.PasswordConfirmRequest;
 import com.secplus.auth.AuthRequests.RegisterRequest;
+import com.secplus.auth.AuthRequests.ResetPasswordRequest;
+import com.secplus.auth.AuthRequests.TwoFactorConfirmRequest;
+import com.secplus.auth.AuthRequests.TwoFactorSetupRequest;
+import com.secplus.auth.AuthRequests.TwoFactorVerifyRequest;
+import com.secplus.auth.AuthRequests.VerifyEmailRequest;
+import com.secplus.auth.AuthViews.LoginView;
+import com.secplus.auth.AuthViews.RecoveryCodesView;
 import com.secplus.auth.AuthViews.SessionView;
+import com.secplus.auth.AuthViews.TwoFactorSetupView;
+import com.secplus.auth.AuthViews.TwoFactorStatusView;
 import com.secplus.auth.AuthViews.UserView;
 import com.secplus.common.AuthException;
 
@@ -46,10 +57,13 @@ public class AuthController {
 
 	private final AuthService auth;
 
+	private final AccountSecurityService accountSecurity;
+
 	private final AuthProperties properties;
 
-	AuthController(AuthService auth, AuthProperties properties) {
+	AuthController(AuthService auth, AccountSecurityService accountSecurity, AuthProperties properties) {
 		this.auth = auth;
+		this.accountSecurity = accountSecurity;
 		this.properties = properties;
 	}
 
@@ -62,11 +76,125 @@ public class AuthController {
 		return respond(session, HttpStatus.CREATED);
 	}
 
+	/**
+	 * Returns a session, or a challenge when 2FA is on.
+	 *
+	 * The challenge path sets **no cookie**, so a caller holding only the
+	 * password comes away with nothing that can read or write study data.
+	 */
 	@PostMapping("/login")
-	ResponseEntity<SessionView> login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
-		AuthService.Session session = auth.login(request, Instant.now(), clientIp(http),
+	ResponseEntity<LoginView> login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
+		AuthService.LoginOutcome outcome = auth.login(request, Instant.now(), clientIp(http),
 				http.getHeader(HttpHeaders.USER_AGENT));
+
+		if (outcome.needsSecondStep()) {
+			return ResponseEntity.ok(LoginView.secondStepRequired(outcome.challenge(), outcome.method()));
+		}
+
+		AuthService.Session session = outcome.session();
+		return ResponseEntity.ok()
+			.header(HttpHeaders.SET_COOKIE, refreshCookie(session.refreshToken()).toString())
+			.body(LoginView.signedIn(session.view()));
+	}
+
+	/** The second step. Same response for a wrong code, an expired one and a wrong challenge. */
+	@PostMapping("/2fa/verify")
+	ResponseEntity<SessionView> verifyTwoFactor(@Valid @RequestBody TwoFactorVerifyRequest request,
+			HttpServletRequest http) {
+
+		AuthService.Session session = auth.verifyTwoFactor(request.challenge(), request.code(), Instant.now(),
+				clientIp(http), http.getHeader(HttpHeaders.USER_AGENT));
 		return respond(session, HttpStatus.OK);
+	}
+
+	// ---------------------------------------------- verification and reset --
+
+	/**
+	 * POST, not GET, even though it is reached from a link.
+	 *
+	 * The link in the email opens the SPA, which then calls this. A GET API
+	 * endpoint would be fetched by the link scanners some mail providers run,
+	 * silently spending the token before the person ever clicked it.
+	 */
+	@PostMapping("/verify-email")
+	ResponseEntity<Void> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+		accountSecurity.verifyEmail(request.token(), Instant.now());
+		return ResponseEntity.noContent().build();
+	}
+
+	@PostMapping("/resend-verification")
+	ResponseEntity<Void> resendVerification(@AuthenticationPrincipal Jwt jwt) {
+		accountSecurity.resendVerification(UUID.fromString(jwt.getSubject()), Instant.now());
+		return ResponseEntity.noContent().build();
+	}
+
+	/**
+	 * Always 204, whether or not the address has an account.
+	 *
+	 * Anything else - a 404, a different message, even a measurably different
+	 * response time - would make this a way of asking who has an account here,
+	 * which is the oracle the login message exists to close.
+	 */
+	@PostMapping("/forgot-password")
+	ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request,
+			HttpServletRequest http) {
+
+		accountSecurity.requestPasswordReset(request.email(), Instant.now(), clientIp(http));
+		return ResponseEntity.noContent().build();
+	}
+
+	/**
+	 * Ends every other session, and clears the refresh cookie on this one too.
+	 *
+	 * Resetting is what someone does when they think their account is
+	 * compromised; leaving the attacker signed in elsewhere would defeat it.
+	 */
+	@PostMapping("/reset-password")
+	ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+		accountSecurity.resetPassword(request.token(), request.password(), Instant.now());
+		return ResponseEntity.noContent()
+			.header(HttpHeaders.SET_COOKIE, expiredCookie().toString())
+			.build();
+	}
+
+	// ------------------------------------------------------- managing 2FA --
+
+	@GetMapping("/2fa")
+	TwoFactorStatusView twoFactorStatus(@AuthenticationPrincipal Jwt jwt) {
+		return accountSecurity.status(UUID.fromString(jwt.getSubject()));
+	}
+
+	/** Starts setup. Nothing is enabled until /2fa/confirm proves a code works. */
+	@PostMapping("/2fa/setup")
+	TwoFactorSetupView beginTwoFactorSetup(@Valid @RequestBody TwoFactorSetupRequest request,
+			@AuthenticationPrincipal Jwt jwt) {
+
+		return accountSecurity.beginSetup(UUID.fromString(jwt.getSubject()), request.method(), Instant.now());
+	}
+
+	/** The only response that ever contains recovery codes in the clear. */
+	@PostMapping("/2fa/confirm")
+	RecoveryCodesView confirmTwoFactorSetup(@Valid @RequestBody TwoFactorConfirmRequest request,
+			@AuthenticationPrincipal Jwt jwt) {
+
+		return new RecoveryCodesView(accountSecurity.confirmSetup(UUID.fromString(jwt.getSubject()),
+				request.method(), request.code(), Instant.now()));
+	}
+
+	@PostMapping("/2fa/disable")
+	ResponseEntity<Void> disableTwoFactor(@Valid @RequestBody PasswordConfirmRequest request,
+			@AuthenticationPrincipal Jwt jwt) {
+
+		accountSecurity.disable(UUID.fromString(jwt.getSubject()), request.password(), Instant.now());
+		return ResponseEntity.noContent().build();
+	}
+
+	@PostMapping("/2fa/recovery-codes")
+	RecoveryCodesView regenerateRecoveryCodes(@Valid @RequestBody PasswordConfirmRequest request,
+			@AuthenticationPrincipal Jwt jwt) {
+
+		return new RecoveryCodesView(accountSecurity.regenerateRecoveryCodes(UUID.fromString(jwt.getSubject()),
+				request.password(), Instant.now()));
 	}
 
 	/**

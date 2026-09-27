@@ -2,6 +2,7 @@ package com.secplus;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
@@ -10,6 +11,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * faster here than the word "refresh token" suggests — see AuthMaintenance.
  */
 @SpringBootApplication
+@EnableAsync
 @EnableScheduling
 public class ServerApplication {
 
