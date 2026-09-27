@@ -86,8 +86,11 @@ or a shared link still lands on the right section.
 the check for the two locked modes — the Overview's cards, `QuizSidebar`'s lock icons and
 `Lessons`' section switch all ask it. Signed out (or with no API), the card turns into a
 greyed `LockedModeCard` and the section renders `AccountRequired` in place of the mode; the
-sign-up and sign-in links carry `?next=` back to the mode. They stay unlocked while auth is
-`loading`, so a signed-in visitor never sees the lock flash. Question of the Day is
+sign-up and sign-in links carry `?next=` back to the mode. `?next=` is only ever followed
+through `secapp/src/auth/safeNext.js`, which keeps a value only if it resolves to this origin —
+anything else is an open redirect to a phishing page, right after a genuine sign-in. A prefix
+check is not enough: browsers read `/\evil.example` as `//evil.example`. The two modes stay
+unlocked while auth is `loading`, so a signed-in visitor never sees the lock flash. Question of the Day is
 *hidden* instead (`showsDailyQuestion`), so it only appears once signed in — the Progress
 page's signed-out card is where it is advertised.
 

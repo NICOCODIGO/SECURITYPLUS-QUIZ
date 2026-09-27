@@ -6,18 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/auth/AuthContext';
+import { safeNext } from '@/auth/safeNext';
 
 /** BCrypt truncates at 72 bytes, so the server caps it there. Match, or a valid password 400s. */
 const MAX_PASSWORD = 72;
 
 const MIN_PASSWORD = 10;
-
-/**
- * Only same-origin paths. Without this check `?next=` is an open redirect:
- * `//evil.example` is protocol-relative and would leave the site.
- */
-const safeNext = (value) =>
-  value && value.startsWith('/') && !value.startsWith('//') ? value : '/progress';
 
 export default function AuthForm({ mode }) {
   const isSignUp = mode === 'signup';
