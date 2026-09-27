@@ -74,28 +74,40 @@ final class Totp {
 
 	/** True when `code` is valid for `secret` at `now`, allowing for clock skew. */
 	static boolean verify(String secret, String code, Instant now) {
+		return matchingStep(secret, code, now) != NO_MATCH;
+	}
+
+	static final long NO_MATCH = -1;
+
+	/**
+	 * The time-step `code` belongs to, or NO_MATCH.
+	 *
+	 * Callers that sign someone in use this rather than verify(), and spend the
+	 * step on the account (User.spendTotpStep) so each code works exactly once.
+	 */
+	static long matchingStep(String secret, String code, Instant now) {
 		if (secret == null || code == null) {
-			return false;
+			return NO_MATCH;
 		}
 		String cleaned = code.trim().replace(" ", "");
 		if (cleaned.length() != DIGITS) {
-			return false;
+			return NO_MATCH;
 		}
 
 		byte[] key;
 		try {
 			key = Base32.decode(secret);
 		} catch (IllegalArgumentException e) {
-			return false;
+			return NO_MATCH;
 		}
 
 		long step = now.getEpochSecond() / STEP_SECONDS;
 		for (long candidate = step - SKEW_STEPS; candidate <= step + SKEW_STEPS; candidate++) {
 			if (constantTimeEquals(generate(key, candidate), cleaned)) {
-				return true;
+				return candidate;
 			}
 		}
-		return false;
+		return NO_MATCH;
 	}
 
 	/** Exposed for tests, which need to produce a code the way an app would. */

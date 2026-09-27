@@ -25,6 +25,13 @@ carry over.
   GitHub has commits you haven't pulled or Docker isn't running, and reinstalls front-end
   packages when a pull changed `package-lock.json`.
 
+**History was rewritten on 2026-09-27** to take personal email addresses out of commit metadata,
+because the repository is public. A clone made before that date must **not** use Sync Changes:
+it would merge the old history, addresses included, straight back in. Re-clone it, or run
+`git fetch` then `git reset --hard origin/<branch>` for each branch (after saving any local
+work). Commit as `NICOCODIGO <153687367+NICOCODIGO@users.noreply.github.com>` — set it per
+clone with `git config user.email`.
+
 Not carried by git, on purpose: editor settings and extensions (VS Code's project settings
 folder is gitignored; turn on VS Code **Settings Sync** instead), and Claude Code's memory, which is per machine. Project
 knowledge lives in `CLAUDE.md` and `docs/` so it travels with the code.
@@ -90,15 +97,24 @@ Read by `server/src/main/resources/application.properties`. All have local defau
 | `AUTH_COOKIE_SAME_SITE` | `Strict` | `Strict` once the API is same-domain |
 | `AUTH_COOKIE_SECURE` | `false` | `true` |
 | `AUTH_TRUST_FORWARDED_FOR` | `false` | `true` behind CloudFront |
+| `AUTH_FORWARDED_FOR_HOPS` | `1` | `2`: CloudFront, then App Runner |
 
 Three of those have failure modes worth knowing, because none of them look like a bug:
 
 - **`AUTH_JWT_SECRET` unset** makes the app generate a key at startup and log a WARN. Sessions
   then die on every restart and deploy — everyone silently signed out. Under 32 bytes fails
   startup deliberately, rather than signing tokens with a weak key.
-- **`AUTH_TRUST_FORWARDED_FOR=true` on a directly reachable origin** is worse than no rate
-  limiting: the header is caller-supplied, so anyone can pick a fresh bucket per request. Only
-  turn it on where every request arrives through a proxy that overwrites it.
+- **`AUTH_FORWARDED_FOR_HOPS` wrong** breaks the per-IP limits in one of two silent ways.
+  Proxies *append* to `X-Forwarded-For` (none of ours overwrite it), so the caller is the entry
+  this many from the right and everything further left is whatever the caller sent. Too high
+  reads a forged entry, so a script picks a fresh bucket per request; too low reads a proxy's
+  address, so strangers share one. It changes whenever the chain in front of App Runner does,
+  **including the move to Amplify**. Check it after any such change: send
+  `forgot-password` for a made-up address 11 times through the site, each with a different
+  `X-Forwarded-For`. The 11th must be a 429. If it is a 204, the value is too high.
+  Per-IP limits stay best-effort even when right, because App Runner can be called directly;
+  that is why every limit protecting a person is also per account or global
+  (`LoginRateLimiter`).
 - **`AUTH_COOKIE_SAME_SITE=Strict` across two domains** means the refresh cookie is never sent,
   so refresh 401s forever and users are signed out every 15 minutes. Dev can't reveal this —
   `localhost:5173` and `localhost:8080` are same-site. See [decisions.md](decisions.md).

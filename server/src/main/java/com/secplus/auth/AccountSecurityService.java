@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,8 @@ import com.secplus.common.AuthException;
  */
 @Service
 public class AccountSecurityService {
+
+	private static final Logger log = LoggerFactory.getLogger(AccountSecurityService.class);
 
 	/**
 	 * What every password-reset request returns, whether or not the address
@@ -77,7 +81,7 @@ public class AccountSecurityService {
 	 */
 	@Transactional
 	public void sendVerification(User user, Instant now) {
-		if (user.isEmailVerified()) {
+		if (user.isEmailVerified() || !withinMailBudget(now)) {
 			return;
 		}
 
@@ -119,6 +123,11 @@ public class AccountSecurityService {
 	 * An unverified address gets no link. That is the one thing verification is
 	 * for: without it, anyone could register somebody else's address and later
 	 * use "reset" to take over the mailbox they never proved they owned.
+	 *
+	 * Over the per-account limit, nothing is issued OR sent, and the answer is
+	 * the same 204. Throwing would say the address has an account; issuing
+	 * without sending would kill the link already in their inbox, turning a
+	 * flood of requests into a way to stop someone resetting at all.
 	 */
 	@Transactional
 	String requestPasswordReset(String email, Instant now, String ip) {
@@ -127,6 +136,9 @@ public class AccountSecurityService {
 
 		users.findByEmail(email)
 			.filter(User::isEmailVerified)
+			.filter(user -> rateLimiter.tryAcquire("forgot:user:" + user.getId(),
+					LoginRateLimiter.FORGOT_PER_ACCOUNT, LoginRateLimiter.FORGOT_WINDOW, now))
+			.filter(user -> withinMailBudget(now))
 			.ifPresent(user -> {
 				UserTokenService.Issued issued = userTokens.issueLink(user.getId(), UserTokenService.RESET,
 						UserTokenService.RESET_TTL, now);
@@ -227,13 +239,15 @@ public class AccountSecurityService {
 				LoginRateLimiter.TWO_FACTOR_WINDOW, now);
 
 		String secret = null;
+		long step = Totp.NO_MATCH;
 		if (method == TwoFactorMethod.TOTP) {
 			secret = user.getTotpSecret();
 			if (secret == null) {
 				throw new AuthException(HttpStatus.BAD_REQUEST, "Start the setup again - nothing is pending.");
 			}
 
-			if (!Totp.verify(secret, code, now)) {
+			step = Totp.matchingStep(secret, code, now);
+			if (step == Totp.NO_MATCH) {
 				throw new AuthException(HttpStatus.BAD_REQUEST, "That code is not right. Check the clock on your device.");
 			}
 		}
@@ -242,6 +256,11 @@ public class AccountSecurityService {
 		}
 
 		user.enableTwoFactor(method, secret);
+		// The code that confirmed setup is spent too, so it cannot also be the
+		// second step of a sign-in in the same 90 seconds.
+		if (step != Totp.NO_MATCH) {
+			user.spendTotpStep(step);
+		}
 		return recoveryCodes.regenerate(userId);
 	}
 
@@ -275,18 +294,43 @@ public class AccountSecurityService {
 
 	// ------------------------------------------------------------ helpers --
 
-	/** Issues and mails a six-digit code. Shared by setup and the login challenge. */
+	/**
+	 * Issues and mails a six-digit code. Shared by setup and the login challenge.
+	 *
+	 * Skipped whole when the mail budget is spent: issuing is what invalidates
+	 * the previous code, so a code already in the inbox keeps working.
+	 */
 	@Transactional
 	void sendLoginCode(User user, Instant now) {
+		if (!withinMailBudget(now)) {
+			return;
+		}
 		UserTokenService.Issued issued = userTokens.issueLoginCode(user.getId(), now);
 		mailer.sendLoginCode(user.getEmail(), issued.value());
+	}
+
+	/**
+	 * Whether one more auth email fits in the global hourly budget.
+	 *
+	 * Checked BEFORE a token is issued, never after, for the reason
+	 * sendLoginCode gives. Logged when it bites, because the only other
+	 * symptom is people saying an email never arrived.
+	 */
+	private boolean withinMailBudget(Instant now) {
+		boolean allowed = rateLimiter.tryAcquire("mail:global", LoginRateLimiter.MAIL_GLOBAL,
+				LoginRateLimiter.MAIL_GLOBAL_WINDOW, now);
+		if (!allowed) {
+			log.warn("Hourly auth-mail budget of {} is spent; skipping a send.", LoginRateLimiter.MAIL_GLOBAL);
+		}
+		return allowed;
 	}
 
 	private void requirePassword(User user, String password, Instant now) {
 		rateLimiter.check("password:user:" + user.getId(), LoginRateLimiter.LOGIN_PER_EMAIL,
 				LoginRateLimiter.LOGIN_WINDOW, now);
 
-		if (password == null || !passwords.matches(password, user.getPasswordHash())) {
+		if (password == null || !AuthRequests.fitsBcrypt(password)
+				|| !passwords.matches(password, user.getPasswordHash())) {
 			throw new AuthException(HttpStatus.UNAUTHORIZED, "That password is incorrect.");
 		}
 		rateLimiter.clear("password:user:" + user.getId());

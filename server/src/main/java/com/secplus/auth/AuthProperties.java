@@ -36,12 +36,23 @@ public class AuthProperties {
 	 * Whether X-Forwarded-For identifies the caller.
 	 *
 	 * Off by default, and that default is the safe one: anything can send the
-	 * header, so trusting it on a directly reachable origin lets a caller pick
-	 * a fresh rate-limit bucket per request and defeat the limiter entirely.
-	 * Turn it on only where every request arrives through a proxy that
-	 * overwrites the header — CloudFront in front of App Runner, in phase 6.
+	 * header. Behind App Runner it has to be on, though - there, the socket
+	 * address is App Runner's own proxy, the same for every caller, so every
+	 * user would share one bucket. See AuthController.clientIp.
 	 */
 	private boolean trustForwardedFor = false;
+
+	/**
+	 * How many proxies in front of the app append to X-Forwarded-For.
+	 *
+	 * The client is this many entries from the right. 1 means "the last entry",
+	 * which is right for one proxy (and for the tests, which send one value).
+	 * Behind CloudFront and then App Runner it is 2. Too low reads a proxy's
+	 * address, so everyone shares a bucket; too high reads what the caller
+	 * sent. Check the deployed value by sending spoofed headers and watching
+	 * the per-IP limit still trip (docs/devops.md).
+	 */
+	private int forwardedForHops = 1;
 
 	public String getSecret() {
 		return secret;
@@ -113,5 +124,13 @@ public class AuthProperties {
 
 	public void setTrustForwardedFor(boolean trustForwardedFor) {
 		this.trustForwardedFor = trustForwardedFor;
+	}
+
+	public int getForwardedForHops() {
+		return forwardedForHops;
+	}
+
+	public void setForwardedForHops(int forwardedForHops) {
+		this.forwardedForHops = Math.max(forwardedForHops, 1);
 	}
 }

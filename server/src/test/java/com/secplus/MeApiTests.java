@@ -240,4 +240,86 @@ class MeApiTests {
 			.andExpect(jsonPath("$.length()").value(1))
 			.andExpect(jsonPath("$[0].correct").value(true));
 	}
+
+	/* ------------------------------------------------------ what is refused -- */
+
+	/**
+	 * Every answer is its own insert, so an uncapped list is a way for any
+	 * account to make the server do unbounded work. Refused before any of it.
+	 */
+	@Test
+	void anAttemptWithMoreAnswersThanAnyQuizHasIsRefused() throws Exception {
+		String token = account();
+		String answers = "{\"id\":\"x\",\"ok\":true},".repeat(501);
+		String body = """
+				{"id":"%s","date":"2026-09-23T12:00:00Z","type":"mock","score":50,
+				 "questionsCount":90,"answers":[%s]}"""
+			.formatted(UUID.randomUUID(), answers.substring(0, answers.length() - 1));
+
+		mvc.perform(post("/api/v1/me/attempts").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON).content(body))
+			.andExpect(status().isBadRequest());
+
+		mvc.perform(get("/api/v1/me/attempts").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+			.andExpect(jsonPath("$.length()").value(0));
+	}
+
+	/**
+	 * Values V1's check constraints would reject. Each has to be a 400 naming
+	 * the input, not a 500 from the database blaming the server.
+	 */
+	@Test
+	void invalidAttemptFieldsAreA400NotA500() throws Exception {
+		String token = account();
+		String hash = aRealHash();
+
+		String badType = attemptJson(UUID.randomUUID(), hash, true).replace("\"type\":\"domain\"", "\"type\":\"daily\"");
+		String badScore = attemptJson(UUID.randomUUID(), hash, true).replace("\"score\":100", "\"score\":101");
+		String impossibleDate = attemptJson(UUID.randomUUID(), hash, true)
+			.replace("2026-09-23T12:00:00Z", "2026-13-45T99:00:00Z");
+		String noId = attemptJson(UUID.randomUUID(), hash, true).replaceFirst("\"id\":\"[^\"]+\",", "");
+
+		for (String body : new String[] { badType, badScore, impossibleDate, noId }) {
+			mvc.perform(post("/api/v1/me/attempts").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+					.contentType(MediaType.APPLICATION_JSON).content(body))
+				.andExpect(status().isBadRequest());
+		}
+	}
+
+	@Test
+	void anImpossibleDailyDateIsA400() throws Exception {
+		String token = account();
+
+		mvc.perform(post("/api/v1/me/daily").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						[{"date":"2026-02-31","correct":true,"at":"2026-09-23T11:00:00Z"}]"""))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void aFlagSetLargerThanTheBankIsRefused() throws Exception {
+		String token = account();
+		StringBuilder flags = new StringBuilder("[");
+		for (int i = 0; i < 1_001; i++) {
+			flags.append(i == 0 ? "" : ",").append("\"h").append(i).append('"');
+		}
+		flags.append(']');
+
+		mvc.perform(put("/api/v1/me/flags").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON).content(flags.toString()))
+			.andExpect(status().isBadRequest());
+	}
+
+	/**
+	 * "Authenticated" means any account, and anyone can make one - so a signed-in
+	 * caller must not reach JVM and request internals either. Not exposed at all.
+	 */
+	@Test
+	void metricsAreNotExposedEvenToASignedInAccount() throws Exception {
+		String token = account();
+
+		mvc.perform(get("/actuator/metrics").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+			.andExpect(status().isNotFound());
+	}
 }

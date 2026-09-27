@@ -3,6 +3,15 @@ package com.secplus.me;
 import java.util.List;
 import java.util.UUID;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
+
 /**
  * One account's own study data, in and out.
  *
@@ -20,6 +29,23 @@ import java.util.UUID;
  */
 public final class MeViews {
 
+	/**
+	 * Answers per attempt. Above the whole bank (444), so no real quiz - a
+	 * domain quiz can be every question in its domain - ever comes near it.
+	 * Every answer is its own insert, so without a cap one request could make
+	 * the server do unbounded work.
+	 */
+	static final int MAX_ANSWERS = 500;
+
+	/** Flags are a set of question hashes; more than the bank holds is not a real set. */
+	static final int MAX_FLAGS = 1_000;
+
+	/** Daily answers sent in one request, e.g. a first sync. Years of daily use. */
+	static final int MAX_DAILY = 2_000;
+
+	/** djb2 in base 36 is a handful of characters; this is room, not a format check. */
+	static final int MAX_HASH = 64;
+
 	private MeViews() {
 	}
 
@@ -28,7 +54,7 @@ public final class MeViews {
 	 * chosen is never captured, so `attempt_answers.chosen_choice_id` stays
 	 * null on everything that arrives through here.
 	 */
-	public record AnswerView(String id, boolean ok) {
+	public record AnswerView(@NotBlank @Size(max = MAX_HASH) String id, boolean ok) {
 	}
 
 	/**
@@ -62,11 +88,25 @@ public final class MeViews {
 	 * reason QuestionViews gives: the split should be impossible to get wrong by
 	 * accident, not merely documented.
 	 */
-	public record AttemptUpload(UUID id, String date, String type, int score, int questionsCount,
-			Integer durationSeconds, String domainTitle, List<AnswerView> answers) {
+	/*
+	 * The constraints mirror V1's check constraints (type, score, count), so a
+	 * bad value is a 400 naming the field rather than a 500 from the database.
+	 */
+	public record AttemptUpload(
+			@NotNull UUID id,
+			@NotBlank @Size(max = 40) String date,
+			@NotNull @Pattern(regexp = "domain|mock|weakest|custom") String type,
+			@Min(0) @Max(100) int score,
+			@Min(1) @Max(MAX_ANSWERS) int questionsCount,
+			@PositiveOrZero Integer durationSeconds,
+			@Size(max = 200) String domainTitle,
+			@NotNull @Size(max = MAX_ANSWERS) List<@Valid @NotNull AnswerView> answers) {
 	}
 
 	/** One Question-of-the-Day answer, keyed by the local date it was shown. */
-	public record DailyView(String date, boolean correct, String at) {
+	public record DailyView(
+			@NotNull @Pattern(regexp = "\\d{4}-\\d{2}-\\d{2}") String date,
+			boolean correct,
+			@NotBlank @Size(max = 40) String at) {
 	}
 }

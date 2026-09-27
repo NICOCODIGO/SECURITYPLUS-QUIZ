@@ -1,5 +1,8 @@
 package com.secplus.auth;
 
+import java.nio.charset.StandardCharsets;
+
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -8,6 +11,20 @@ import jakarta.validation.constraints.Size;
 public final class AuthRequests {
 
 	private AuthRequests() {
+	}
+
+	/** BCrypt reads at most this many bytes of a password. */
+	static final int BCRYPT_MAX_BYTES = 72;
+
+	/**
+	 * Whether BCrypt will see all of `password`.
+	 *
+	 * Bytes, not characters: `@Size(max = 72)` counts characters, and an
+	 * accented letter or an emoji is two to four bytes, so a password can pass
+	 * that and still be too long. Null counts as fitting; @NotBlank reports it.
+	 */
+	static boolean fitsBcrypt(String password) {
+		return password == null || password.getBytes(StandardCharsets.UTF_8).length <= BCRYPT_MAX_BYTES;
 	}
 
 	/**
@@ -21,6 +38,11 @@ public final class AuthRequests {
 			@NotBlank @Email @Size(max = 320) String email,
 			@NotBlank @Size(min = 10, max = 72) String password,
 			@Size(max = 80) String displayName) {
+
+		@AssertTrue(message = "is too long: at most 72 bytes, and some characters take more than one")
+		public boolean isPasswordWithinLimit() {
+			return fitsBcrypt(password);
+		}
 	}
 
 	/**
@@ -52,6 +74,11 @@ public final class AuthRequests {
 	 * two different passwords would open the account.
 	 */
 	public record ResetPasswordRequest(@NotBlank String token, @NotBlank @Size(min = 10, max = 72) String password) {
+
+		@AssertTrue(message = "is too long: at most 72 bytes, and some characters take more than one")
+		public boolean isPasswordWithinLimit() {
+			return fitsBcrypt(password);
+		}
 	}
 
 	public record TwoFactorSetupRequest(@NotBlank String method) {

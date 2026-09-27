@@ -70,6 +70,39 @@ public class LoginRateLimiter {
 
 	static final int FORGOT_PER_IP = 10;
 
+	/**
+	 * How many reset links one account can be mailed in FORGOT_WINDOW.
+	 *
+	 * The per-IP limit alone cannot protect a person: the IP a request claims
+	 * is only as trustworthy as the proxies in front of us, and the API is
+	 * reachable directly. Without this, anyone could fill someone's inbox with
+	 * reset emails - and enough of those get the sending account suspended,
+	 * which stops mail for everybody.
+	 */
+	static final int FORGOT_PER_ACCOUNT = 3;
+
+	/**
+	 * Every registration, from everywhere, per REGISTER_WINDOW.
+	 *
+	 * The backstop for REGISTER_PER_IP, for the same reason as above: a per-IP
+	 * bucket only counts what the caller cannot choose. Generous - a whole
+	 * lecture hall signing up at once is a few dozen - so it only ever bites a
+	 * script.
+	 */
+	static final int REGISTER_GLOBAL = 200;
+
+	/**
+	 * Every verification, reset and sign-in email, from everywhere, per hour.
+	 *
+	 * Skipped rather than refused when full, so it never becomes an error
+	 * anyone sees: an address can be verified later, and a sign-in code already
+	 * in someone's inbox stays valid. What it prevents is the one outcome
+	 * nobody can undo from here - SES suspending the account for abuse.
+	 */
+	static final int MAIL_GLOBAL = 200;
+
+	static final Duration MAIL_GLOBAL_WINDOW = Duration.ofHours(1);
+
 	static final Duration LOGIN_WINDOW = Duration.ofMinutes(15);
 
 	static final Duration REGISTER_WINDOW = Duration.ofHours(1);

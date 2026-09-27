@@ -263,22 +263,28 @@ public class AuthController {
 	}
 
 	/**
-	 * Who the rate limiter counts against.
+	 * Who the per-IP rate limits count against.
 	 *
-	 * X-Forwarded-For is only consulted when the deployment says every request
-	 * arrives through a proxy that overwrites it. Trusting it unconditionally
-	 * would be worse than having no limiter at all: the header is caller-
-	 * supplied, so a script could send a different value on every request and
-	 * get a fresh bucket each time, while a legitimate user behind a real proxy
-	 * stays correctly counted.
+	 * X-Forwarded-For is a list that every proxy APPENDS to - CloudFront and
+	 * App Runner included; neither overwrites it. So everything to the left is
+	 * whatever the caller sent, and only the entries our own proxies added can
+	 * be believed. The client is the one `forwardedForHops` from the right: the
+	 * address the outermost proxy saw. Taking the FIRST entry, as this once
+	 * did, let a script send a fresh value per request and a fresh bucket with
+	 * it.
 	 *
-	 * Only the first entry is taken — the rest are appendable by the client.
+	 * Even read correctly this is best-effort, because App Runner can be called
+	 * directly, skipping the proxy that makes the count right. That is why every
+	 * limit that protects a person is per account or global as well
+	 * (LoginRateLimiter), never per IP alone.
 	 */
-	private String clientIp(HttpServletRequest request) {
+	String clientIp(HttpServletRequest request) {
 		if (properties.isTrustForwardedFor()) {
 			String forwarded = request.getHeader("X-Forwarded-For");
 			if (forwarded != null && !forwarded.isBlank()) {
-				return forwarded.split(",")[0].trim();
+				String[] entries = forwarded.split(",");
+				int index = Math.max(entries.length - properties.getForwardedForHops(), 0);
+				return entries[index].trim();
 			}
 		}
 		return request.getRemoteAddr();

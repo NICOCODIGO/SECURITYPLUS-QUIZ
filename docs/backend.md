@@ -106,8 +106,14 @@ to merge. The browser instead sends up any attempt the server does not already h
 hydrates. And no `/me/presets` — `CustomQuizBuilder` holds its configuration in `useState` and
 never persists it, so that table maps to a key nothing writes.
 
-**Ops** — `/actuator/health` (public), `/actuator/metrics`, `/actuator/prometheus`. No
-`/swagger-ui`: `springdoc` is not a dependency.
+**Ops** — `/actuator/health` and `/actuator/info`, both public. Metrics are deliberately **not**
+exposed: "authenticated" means any account, and anyone can make one. No `/swagger-ui`:
+`springdoc` is not a dependency.
+
+**`/me` writes are size-limited** (`MeViews`): an attempt carries at most `MAX_ANSWERS` answers,
+flags and daily uploads are capped per request, and a malformed date is a 400, not a 500. Every
+answer is its own insert, so without the caps one signed-in request could make the server do
+unbounded work.
 
 ### The one contract that must not drift
 
@@ -209,8 +215,22 @@ Own implementation, not Cognito.
   token is stored, so a database leak hands out no live sessions.
 - Rate limiting on login, register, refresh, password reset and **per 2FA challenge**.
   In-memory and per-instance, deliberately — see [decisions.md](decisions.md).
+- **Per-IP limits are best-effort; the ones that protect people are per account or global.**
+  The IP comes from `X-Forwarded-For`, which is only as trustworthy as the proxies in front of
+  the app, and App Runner can be called directly. So: logins are also capped per email; reset
+  emails per account (`FORGOT_PER_ACCOUNT`); registrations and all auth mail globally
+  (`REGISTER_GLOBAL`, `MAIL_GLOBAL`). The mail cap **skips** rather than refuses, and is checked
+  *before* a token is issued, so it never surfaces as an error and never invalidates a link
+  already in someone's inbox. Its job is keeping SES from suspending the account for abuse.
 - Optional 2FA: emailed six-digit codes, or RFC 6238 TOTP written against the JDK. Ten
-  single-use recovery codes, hashed, shown once.
+  single-use recovery codes, hashed, shown once. **Every TOTP code works once**:
+  `users.totp_last_step` (V3) records the step spent, and anything at or below it is refused.
+  Without it a code stayed valid for its whole ~90-second window after being used.
+- **Known gap:** TOTP secrets are stored in plain text, and recovery codes as unsalted SHA-256.
+  Both only matter after a database breach (RDS is private and encrypted at rest), and they have
+  to be fixed together: with the TOTP secret in hand an attacker can simply generate codes, so
+  peppering the recovery codes alone would add nothing. The fix is to encrypt the secret and
+  HMAC the codes under one key held in SSM.
 - Mail over SES SMTP. **Sending never fails the request that triggered it** — `Mailer` logs and
   swallows, because a registration that 500s over an SMTP hiccup is worse than a late email.
   With `MAIL_HOST` unset it logs what it would have sent, so the whole flow is walkable from a

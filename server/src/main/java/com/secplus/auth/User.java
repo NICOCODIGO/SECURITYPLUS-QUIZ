@@ -66,6 +66,10 @@ public class User {
 	@Column(name = "totp_secret")
 	private String totpSecret;
 
+	/** The last TOTP step spent, so a code works once. See V3. */
+	@Column(name = "totp_last_step")
+	private Long totpLastStep;
+
 	protected User() {
 		// for JPA
 	}
@@ -140,6 +144,23 @@ public class User {
 		}
 		this.twoFactorMethod = method;
 		this.totpSecret = (method == TwoFactorMethod.TOTP) ? secret : null;
+		this.totpLastStep = null;
+	}
+
+	/**
+	 * Spends a TOTP time-step, refusing one already spent.
+	 *
+	 * A code stays valid for about 90 seconds, so without this the same six
+	 * digits work again for the rest of that window - after their owner has
+	 * used them, for anyone who saw or phished them. Steps only move forward,
+	 * so "at or below the last one" is the whole test.
+	 */
+	boolean spendTotpStep(long step) {
+		if (totpLastStep != null && step <= totpLastStep) {
+			return false;
+		}
+		this.totpLastStep = step;
+		return true;
 	}
 
 	/**
@@ -151,6 +172,7 @@ public class User {
 	 */
 	void stageTotpSecret(String secret) {
 		this.totpSecret = secret;
+		this.totpLastStep = null;
 	}
 
 	public void changePassword(String newPasswordHash) {
@@ -161,5 +183,6 @@ public class User {
 	void disableTwoFactor() {
 		this.twoFactorMethod = null;
 		this.totpSecret = null;
+		this.totpLastStep = null;
 	}
 }

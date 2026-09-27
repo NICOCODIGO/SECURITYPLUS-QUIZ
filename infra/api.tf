@@ -110,10 +110,16 @@ resource "aws_apprunner_service" "api" {
         runtime_environment_variables = {
           SPRING_PROFILES_ACTIVE = "prod"
 
-          # Safe here and only here: every request arrives through CloudFront,
-          # which overwrites X-Forwarded-For. On a directly reachable origin
-          # this would let a caller pick their own rate-limit bucket.
+          # Needed: App Runner's own proxy is the socket peer for every request,
+          # so without the header every user would share one rate-limit bucket.
+          # Proxies APPEND to X-Forwarded-For - CloudFront adds the viewer, then
+          # App Runner adds CloudFront - so the caller is 2 from the right, and
+          # anything further left is caller-supplied. App Runner can also be
+          # called directly, which is why every limit that protects a person is
+          # per account or global too. See AuthController.clientIp, and
+          # docs/devops.md for how to check this value after a deploy.
           AUTH_TRUST_FORWARDED_FOR = "true"
+          AUTH_FORWARDED_FOR_HOPS  = "2"
 
           AUTH_COOKIE_SECURE = "true"
           # Holds only because /api/* is served from the site's own domain.

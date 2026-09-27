@@ -1,5 +1,6 @@
 package com.secplus.common;
 
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import jakarta.validation.ConstraintViolation;
@@ -60,6 +61,22 @@ public class ApiExceptionHandler {
 			response.header(HttpHeaders.RETRY_AFTER, Long.toString(ex.getRetryAfterSeconds()));
 		}
 		return response.body(problem);
+	}
+
+	/**
+	 * A date the client sent that does not parse - "2026-13-45", say, which
+	 * has the right shape for a pattern check but is not a day.
+	 *
+	 * Parsed where it is stored (MeStore), so it escapes as a runtime exception
+	 * and would otherwise be a 500: the server blamed for the client's input.
+	 * The detail stays generic; the parser's message echoes the input back.
+	 */
+	@ExceptionHandler(DateTimeParseException.class)
+	ProblemDetail onBadDate(DateTimeParseException ex) {
+		ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+		problem.setTitle("Invalid date");
+		problem.setDetail("A date in the request is not a valid ISO-8601 date or time.");
+		return problem;
 	}
 
 	/** "limit: must be greater than or equal to 1" — the parameter, not the method path. */

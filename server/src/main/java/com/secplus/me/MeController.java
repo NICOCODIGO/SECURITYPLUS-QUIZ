@@ -4,8 +4,10 @@ import java.util.List;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -87,7 +89,9 @@ public class MeController {
 	@PutMapping("/flags")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@Transactional
-	void replaceFlags(@AuthenticationPrincipal Jwt jwt, @RequestBody @NotNull List<String> hashes) {
+	void replaceFlags(@AuthenticationPrincipal Jwt jwt,
+			@RequestBody @NotNull @Size(max = MeViews.MAX_FLAGS)
+			List<@NotBlank @Size(max = MeViews.MAX_HASH) String> hashes) {
 		store.replaceFlags(caller(jwt), hashes);
 	}
 
@@ -102,7 +106,8 @@ public class MeController {
 	@PostMapping("/daily")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@Transactional
-	void saveDaily(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody @NotEmpty List<DailyView> days) {
+	void saveDaily(@AuthenticationPrincipal Jwt jwt,
+			@Valid @RequestBody @NotEmpty @Size(max = MeViews.MAX_DAILY) List<DailyView> days) {
 		UUID userId = caller(jwt);
 		days.forEach(day -> store.saveDaily(userId, day));
 	}

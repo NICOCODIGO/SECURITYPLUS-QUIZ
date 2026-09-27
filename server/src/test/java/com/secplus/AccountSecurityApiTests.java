@@ -370,4 +370,99 @@ class AccountSecurityApiTests {
 					{"challenge":"%s","code":"%s"}""".formatted(challenge, code)));
 	}
 
+	// ------------------------------------------------------- mail flooding --
+
+	/**
+	 * The per-IP limit cannot protect a person, because the IP is only as good
+	 * as the proxies in front of us. Each request here claims a different
+	 * address - exactly what a script would do - and the account is still
+	 * mailed no more than its own cap. The answer never changes, so the cap
+	 * cannot be used to learn that the address has an account.
+	 */
+	@Test
+	void resetEmailsAreCappedPerAccountWhateverAddressTheyClaimToComeFrom() throws Exception {
+		String email = freshEmail();
+		register(email);
+		access.verify(email);
+
+		for (int i = 1; i <= 5; i++) {
+			MvcResult result = mvc.perform(post("/api/v1/auth/forgot-password")
+					.header(FORWARDED_FOR, "203.0.113." + i)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{"email":"%s"}""".formatted(email)))
+				.andReturn();
+			assertThat(result.getResponse().getStatus()).as("request %d", i).isEqualTo(204);
+		}
+
+		assertThat(access.resetEmailsSent(email, 3))
+			.as("five requests, but only three emails")
+			.isEqualTo(3);
+	}
+
+	/**
+	 * With the hourly budget spent, nothing is sent - and the request still
+	 * looks exactly like success, so the budget is invisible from outside.
+	 */
+	@Test
+	void aSpentMailBudgetSkipsTheSendSilently() throws Exception {
+		String email = freshEmail();
+		register(email);
+		access.verify(email);
+
+		access.spendMailBudget();
+		try {
+			assertThat(forgot(email).getResponse().getStatus()).isEqualTo(204);
+			assertThat(access.resetTokenOrNull(email)).as("over budget, no reset email").isNull();
+		}
+		finally {
+			access.restoreMailBudget();
+		}
+
+		forgot(email);
+		assertThat(access.resetToken(email)).as("and mail resumes once there is budget").isNotBlank();
+	}
+
+	// ------------------------------------------------------------- TOTP --
+
+	/**
+	 * An authenticator code is valid for about 90 seconds. Without this, the
+	 * six digits someone just used still work for the rest of that window - for
+	 * anyone who saw them over a shoulder or phished them in real time.
+	 */
+	@Test
+	void anAuthenticatorCodeWorksOnlyOnce() throws Exception {
+		String email = freshEmail();
+		register(email);
+		access.verify(email);
+		String secret = access.enableTotp(email);
+
+		String first = JsonPath.read(login(email, "correct-horse-battery")
+			.getResponse().getContentAsString(), "$.challenge");
+		String code = access.totpCode(secret);
+		verify(first, code).andExpect(status().isOk());
+
+		String second = JsonPath.read(login(email, "correct-horse-battery")
+			.getResponse().getContentAsString(), "$.challenge");
+		verify(second, code)
+			.andExpect(status().isUnauthorized());
+	}
+
+	// --------------------------------------------------------- passwords --
+
+	/**
+	 * 72 characters, but 144 bytes: each "é" is two. BCrypt reads 72 bytes, so
+	 * this has to be refused as too long - not accepted and silently cut, and
+	 * not a 500 from the encoder.
+	 */
+	@Test
+	void aPasswordOverBcryptsByteLimitIsRefusedNotTruncated() throws Exception {
+		mvc.perform(post("/api/v1/auth/register")
+				.header(FORWARDED_FOR, callerIp)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"email":"%s","password":"%s"}""".formatted(freshEmail(), "é".repeat(72))))
+			.andExpect(status().isBadRequest());
+	}
+
 }

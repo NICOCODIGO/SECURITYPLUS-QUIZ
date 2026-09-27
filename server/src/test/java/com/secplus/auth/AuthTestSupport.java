@@ -1,10 +1,12 @@
 package com.secplus.auth;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import javax.sql.DataSource;
@@ -56,6 +58,9 @@ public class AuthTestSupport {
 
 		private final Map<String, String> loginCodes = new ConcurrentHashMap<>();
 
+		/** How many resets went out per address - the tokens map only keeps the last. */
+		private final Map<String, AtomicInteger> resetCounts = new ConcurrentHashMap<>();
+
 		RecordingMailer(JavaMailSender sender) {
 			super(sender, "", "no-reply@test.invalid", "http://localhost:5173");
 		}
@@ -68,6 +73,7 @@ public class AuthTestSupport {
 		@Override
 		public void sendPasswordReset(String to, String token) {
 			this.resets.put(to.toLowerCase(), token);
+			this.resetCounts.computeIfAbsent(to.toLowerCase(), ignored -> new AtomicInteger()).incrementAndGet();
 		}
 
 		@Override
@@ -100,6 +106,11 @@ public class AuthTestSupport {
 			return this.loginCodes.get(to.toLowerCase());
 		}
 
+		int recordedResetCount(String to) {
+			AtomicInteger count = this.resetCounts.get(to.toLowerCase());
+			return count == null ? 0 : count.get();
+		}
+
 	}
 
 	@Bean
@@ -110,8 +121,8 @@ public class AuthTestSupport {
 
 	@Bean
 	AuthTestAccess authTestAccess(UserRepository users, RecoveryCodeService recoveryCodes,
-			RecordingMailer mailer, DataSource dataSource) {
-		return new AuthTestAccess(users, recoveryCodes, mailer, dataSource);
+			RecordingMailer mailer, DataSource dataSource, LoginRateLimiter rateLimiter) {
+		return new AuthTestAccess(users, recoveryCodes, mailer, dataSource, rateLimiter);
 	}
 
 	/** What the tests actually call. */
@@ -125,12 +136,66 @@ public class AuthTestSupport {
 
 		private final JdbcClient db;
 
+		private final LoginRateLimiter rateLimiter;
+
 		AuthTestAccess(UserRepository users, RecoveryCodeService recoveryCodes, RecordingMailer mailer,
-				DataSource dataSource) {
+				DataSource dataSource, LoginRateLimiter rateLimiter) {
 			this.users = users;
 			this.recoveryCodes = recoveryCodes;
 			this.mailer = mailer;
 			this.db = JdbcClient.create(dataSource);
+			this.rateLimiter = rateLimiter;
+		}
+
+		/**
+		 * Resets mailed to `email`, once at least `atLeast` have arrived - then a
+		 * short pause, so a send over the cap still in flight would be counted.
+		 */
+		public int resetEmailsSent(String email, int atLeast) {
+			await(() -> mailer.recordedResetCount(email) >= atLeast ? "" : null, email, atLeast + " reset emails");
+			try {
+				Thread.sleep(300);
+			}
+			catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+			return mailer.recordedResetCount(email);
+		}
+
+		// ------------------------------------------------------ mail budget --
+
+		/**
+		 * Uses up the global hourly mail budget.
+		 *
+		 * The limiter is shared by the whole test context, so every caller must
+		 * restore it in a `finally` - otherwise every later test in the context
+		 * silently stops receiving mail.
+		 */
+		public void spendMailBudget() {
+			Instant now = Instant.now();
+			while (rateLimiter.tryAcquire("mail:global", LoginRateLimiter.MAIL_GLOBAL,
+					LoginRateLimiter.MAIL_GLOBAL_WINDOW, now)) {
+				// spend
+			}
+		}
+
+		public void restoreMailBudget() {
+			rateLimiter.clear("mail:global");
+		}
+
+		// ------------------------------------------------------------- TOTP --
+
+		/** Turns on authenticator-app 2FA and returns the secret, as a phone would hold it. */
+		@Transactional
+		public String enableTotp(String email) {
+			String secret = Totp.newSecret();
+			user(email).enableTwoFactor(TwoFactorMethod.TOTP, secret);
+			return secret;
+		}
+
+		/** The code an authenticator app shows right now. */
+		public String totpCode(String secret) {
+			return Totp.codeAt(secret, Instant.now());
 		}
 
 		// ------------------------------------------------ what was mailed --

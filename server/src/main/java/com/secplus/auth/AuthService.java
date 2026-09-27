@@ -104,6 +104,8 @@ public class AuthService {
 	Session register(RegisterRequest request, Instant now, String ip, String userAgent) {
 		rateLimiter.check("register:ip:" + ip, LoginRateLimiter.REGISTER_PER_IP,
 				LoginRateLimiter.REGISTER_WINDOW, now);
+		rateLimiter.check("register:global", LoginRateLimiter.REGISTER_GLOBAL,
+				LoginRateLimiter.REGISTER_WINDOW, now);
 
 		if (users.existsByEmail(request.email())) {
 			throw new AuthException(HttpStatus.CONFLICT, "That email is already registered.");
@@ -132,6 +134,14 @@ public class AuthService {
 		rateLimiter.check("login:ip:" + ip, LoginRateLimiter.LOGIN_PER_IP, LoginRateLimiter.LOGIN_WINDOW, now);
 		String emailKey = "login:email:" + request.email().toLowerCase();
 		rateLimiter.check(emailKey, LoginRateLimiter.LOGIN_PER_EMAIL, LoginRateLimiter.LOGIN_WINDOW, now);
+
+		// No account can have a password BCrypt cannot read (register and reset
+		// both refuse one), so this is simply wrong - answered like any wrong
+		// password, after the same hashing cost, rather than handed to BCrypt.
+		if (!AuthRequests.fitsBcrypt(request.password())) {
+			passwords.matches("", dummyHash);
+			throw new AuthException(HttpStatus.UNAUTHORIZED, BAD_CREDENTIALS);
+		}
 
 		Optional<User> found = users.findByEmail(request.email());
 
@@ -221,10 +231,16 @@ public class AuthService {
 	 */
 	private boolean codeAccepted(User user, String code, Instant now) {
 		boolean primary = (user.getTwoFactorMethod() == TwoFactorMethod.TOTP)
-				? Totp.verify(user.getTotpSecret(), code, now)
+				? totpAccepted(user, code, now)
 				: userTokens.redeemLoginCode(user.getId(), code, now);
 
 		return primary || recoveryCodes.redeem(user.getId(), code, now);
+	}
+
+	/** Valid AND not already spent - an authenticator code works once, like an emailed one. */
+	private static boolean totpAccepted(User user, String code, Instant now) {
+		long step = Totp.matchingStep(user.getTotpSecret(), code, now);
+		return step != Totp.NO_MATCH && user.spendTotpStep(step);
 	}
 
 	@Transactional
