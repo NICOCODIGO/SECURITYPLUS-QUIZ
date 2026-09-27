@@ -152,7 +152,7 @@ resource "aws_amplify_branch" "main" {
   app_id      = aws_amplify_app.web.id
   branch_name = "main"
   stage       = "PRODUCTION"
-  framework   = "React"
+  framework   = "Web"
 
   enable_auto_build = true
 

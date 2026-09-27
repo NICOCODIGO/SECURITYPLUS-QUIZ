@@ -121,6 +121,12 @@ resource "aws_apprunner_service" "api" {
           AUTH_TRUST_FORWARDED_FOR = "true"
           AUTH_FORWARDED_FOR_HOPS  = "2"
 
+          # TEMPORARY, while the move to Amplify settles the proxy chain: logs
+          # each X-Forwarded-For and the entry chosen (AuthController.clientIp),
+          # so the hops value above can be read off rather than guessed. Logs
+          # IP addresses - remove once the value is confirmed.
+          LOGGING_LEVEL_COM_SECPLUS_AUTH_AUTHCONTROLLER = "DEBUG"
+
           AUTH_COOKIE_SECURE = "true"
           # Holds only because /api/* is served from the site's own domain.
           AUTH_COOKIE_SAME_SITE = "Strict"

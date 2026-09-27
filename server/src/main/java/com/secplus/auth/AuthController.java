@@ -6,6 +6,8 @@ import java.util.UUID;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -54,6 +56,8 @@ import com.secplus.common.AuthException;
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
+
+	private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
 	private final AuthService auth;
 
@@ -284,7 +288,14 @@ public class AuthController {
 			if (forwarded != null && !forwarded.isBlank()) {
 				String[] entries = forwarded.split(",");
 				int index = Math.max(entries.length - properties.getForwardedForHops(), 0);
-				return entries[index].trim();
+				String chosen = entries[index].trim();
+				// Off unless LOGGING_LEVEL_COM_SECPLUS_AUTH_AUTHCONTROLLER=DEBUG. The
+				// way to set forwarded-for-hops after the proxies in front change:
+				// compare `chosen` with the caller's real public IP. Logs addresses,
+				// so switch it back off afterwards.
+				log.debug("X-Forwarded-For [{}] has {} entries; using {} (hops={})", forwarded, entries.length,
+						chosen, properties.getForwardedForHops());
+				return chosen;
 			}
 		}
 		return request.getRemoteAddr();
