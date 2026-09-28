@@ -99,10 +99,10 @@ variable "github_access_token" {
   sensitive   = true
 }
 
-variable "amplify_api_url" {
-  description = "VITE_API_URL for the Amplify build. Empty means the branch's own amplifyapp.com address, which is right until the domain moves to Amplify."
+variable "amplify_default_host" {
+  description = "The main branch's amplifyapp.com address, which every Amplify app has and cannot remove; it is redirected to the domain. A variable because the app cannot reference its own default_domain in its rules. Changes only if the app is recreated."
   type        = string
-  default     = ""
+  default     = "main.ddd6s3rqnsf8m.amplifyapp.com"
 }
 
 variable "extra_cors_origins" {

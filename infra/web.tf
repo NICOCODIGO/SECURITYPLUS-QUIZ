@@ -91,16 +91,18 @@ resource "aws_cloudfront_response_headers_policy" "security" {
 
 # ------------------------------------------------------------- distribution --
 
+# RETIRED. certucation.click moved to Amplify (amplify.tf). Disabled and with
+# no aliases, so it serves nothing and no longer claims the domain - CloudFront
+# lets only one distribution hold a hostname, and Amplify's own distribution
+# now does. Kept, disabled, only so the move can be rolled back; this file is
+# deleted once the new setup has been confirmed.
 resource "aws_cloudfront_distribution" "site" {
-  enabled             = true
+  enabled             = false
   default_root_object = "index.html"
   price_class         = "PriceClass_100" # NA + EU; the cheapest tier
-  comment             = "${local.name} — SPA and API on one domain"
+  comment             = "${local.name} — retired; the site is on Amplify"
 
-  # The apex is canonical; www is aliased only so the function below can redirect
-  # it. An alias CloudFront does not know about is answered with 403, so both
-  # names have to be listed even though one only ever redirects.
-  aliases = [var.domain_name, "www.${var.domain_name}"]
+  aliases = []
 
   origin {
     origin_id                = "s3"
@@ -129,11 +131,6 @@ resource "aws_cloudfront_distribution" "site" {
     cache_policy_id            = data.aws_cloudfront_cache_policy.caching_optimized.id
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
     compress                   = true
-
-    function_association {
-      event_type   = "viewer-request"
-      function_arn = aws_cloudfront_function.redirect_to_apex.arn
-    }
   }
 
   # The API. Three things here are load-bearing and each fails silently if wrong.
@@ -185,12 +182,9 @@ resource "aws_cloudfront_distribution" "site" {
     }
   }
 
+  # The custom certificate now serves Amplify; with no aliases this needs none.
   viewer_certificate {
-    acm_certificate_arn = aws_acm_certificate_validation.site.certificate_arn
-    # sni-only is required with a custom certificate. The alternative dedicates
-    # an IP address per distribution and bills hundreds of dollars a month.
-    ssl_support_method       = "sni-only"
-    minimum_protocol_version = "TLSv1.2_2021"
+    cloudfront_default_certificate = true
   }
 }
 

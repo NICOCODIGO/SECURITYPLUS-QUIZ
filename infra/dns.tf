@@ -167,36 +167,5 @@ resource "aws_acm_certificate_validation" "site" {
 
 # -------------------------------------------------------------- site records --
 
-# A and AAAA ALIAS records, not CNAMEs: a zone apex cannot hold a CNAME, and an
-# alias also costs nothing to resolve. AAAA matters because the distribution has
-# IPv6 enabled by default, and an IPv6-only client with no AAAA record simply
-# cannot reach the site.
-resource "aws_route53_record" "apex" {
-  for_each = toset(["A", "AAAA"])
-
-  zone_id = data.aws_route53_zone.main.zone_id
-  name    = var.domain_name
-  type    = each.value
-
-  alias {
-    name                   = aws_cloudfront_distribution.site.domain_name
-    zone_id                = aws_cloudfront_distribution.site.hosted_zone_id
-    evaluate_target_health = false
-  }
-}
-
-# www exists only to be redirected to the apex — see the CloudFront function in
-# web.tf for why serving both would be a bug rather than a convenience.
-resource "aws_route53_record" "www" {
-  for_each = toset(["A", "AAAA"])
-
-  zone_id = data.aws_route53_zone.main.zone_id
-  name    = "www.${var.domain_name}"
-  type    = each.value
-
-  alias {
-    name                   = aws_cloudfront_distribution.site.domain_name
-    zone_id                = aws_cloudfront_distribution.site.hosted_zone_id
-    evaluate_target_health = false
-  }
-}
+# The apex and www records now point at Amplify, and live in amplify.tf beside
+# the domain association they depend on.

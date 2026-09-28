@@ -1,14 +1,11 @@
 output "site_url" {
   description = "The public URL. Both the app and /api/* are served from here."
 
-  # The custom domain, not the CloudFront one. scripts/deploy.sh reads this and
-  # feeds it to three places at once - VITE_API_URL at build time,
-  # CORS_ALLOWED_ORIGINS and APP_BASE_URL on App Runner - so this single line is
-  # what puts the real domain in email links as well as in the front end.
-  #
-  # Depends on the validation, not just the distribution: until the certificate
-  # is attached, this hostname does not serve.
-  value = "https://${trimsuffix(aws_route53_record.apex["A"].name, ".")}"
+  # The custom domain. scripts/deploy.sh reads this and feeds it to
+  # CORS_ALLOWED_ORIGINS and APP_BASE_URL on App Runner, so this single line is
+  # what puts the real domain in email links. (The front end's VITE_API_URL is
+  # set on the Amplify branch, from the same variable.)
+  value = "https://${var.domain_name}"
 }
 
 output "cloudfront_domain" {

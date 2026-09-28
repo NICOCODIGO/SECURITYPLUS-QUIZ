@@ -8,9 +8,8 @@
 # below does that: a 200 rewrite to another URL is a reverse proxy, so the
 # browser only ever talks to this app's own domain.
 #
-# Being brought up alongside the CloudFront distribution in web.tf, not instead
-# of it. Until the domain moves, this serves only its amplifyapp.com address,
-# which is where it is tested.
+# Serves certucation.click (domain association at the bottom). The app itself
+# was created in the console and imported, so it has no access token here.
 
 # ------------------------------------------------------- security headers --
 
@@ -123,10 +122,18 @@ resource "aws_amplify_app" "web" {
 
   # Order matters: the first rule that matches wins.
 
+  # The amplifyapp.com address every Amplify app has cannot be removed, so it
+  # sends people to the real one. First, so it wins over the /api proxy too:
+  # nothing should use that host once the domain is attached.
+  custom_rule {
+    source = "https://${var.amplify_default_host}/<*>"
+    target = "https://${var.domain_name}/<*>"
+    status = "301"
+  }
+
   # www only ever redirects, so cookies have one host — signing in on www and
-  # later opening the apex would otherwise look like being signed out. Inert
-  # until www is attached to this app. Email links are built from APP_BASE_URL,
-  # the apex, so they never pass through this redirect.
+  # later opening the apex would otherwise look like being signed out. Email
+  # links are built from APP_BASE_URL, the apex, so they never pass through it.
   custom_rule {
     source = "https://www.${var.domain_name}/<*>"
     target = "https://${var.domain_name}/<*>"
@@ -167,9 +174,76 @@ resource "aws_amplify_branch" "main" {
   enable_auto_build = true
 
   # Baked into the bundle at build time, and must be absolute (apiClient.js).
-  # Until the domain moves it is this branch's own amplifyapp.com address, so
-  # the test exercises the /api proxy above rather than calling the live site.
+  # The site's own domain, so API calls go through the /api proxy above and
+  # stay same-origin. Changing it needs a rebuild: Amplify does not rebuild on
+  # an environment change by itself.
   environment_variables = {
-    VITE_API_URL = var.amplify_api_url != "" ? var.amplify_api_url : "https://main.${aws_amplify_app.web.default_domain}"
+    VITE_API_URL = "https://${var.domain_name}"
+  }
+}
+
+# ------------------------------------------------------------------ domain --
+
+# certucation.click and www, on the main branch.
+#
+# The existing ACM certificate (dns.tf), not an Amplify-managed one: it is
+# already issued and validated for exactly these two names, so there is no
+# wait for a new certificate while the site is down.
+resource "aws_amplify_domain_association" "site" {
+  app_id                 = aws_amplify_app.web.id
+  domain_name            = var.domain_name
+  enable_auto_sub_domain = false
+
+  # false, deliberately. Amplify may wait for the records below before it calls
+  # the domain verified, and the records need this resource's output - so
+  # waiting here can deadlock until the timeout. It reports the CloudFront
+  # target as soon as the association exists; watch the status afterwards with
+  # `aws amplify get-domain-association` until it reads AVAILABLE.
+  wait_for_verification = false
+
+  certificate_settings {
+    type                   = "CUSTOM"
+    custom_certificate_arn = aws_acm_certificate_validation.site.certificate_arn
+  }
+
+  sub_domain {
+    branch_name = aws_amplify_branch.main.branch_name
+    prefix      = ""
+  }
+
+  sub_domain {
+    branch_name = aws_amplify_branch.main.branch_name
+    prefix      = "www"
+  }
+}
+
+locals {
+  # Amplify reports each sub-domain as " CNAME dxxxx.cloudfront.net"; both
+  # point at the same distribution.
+  amplify_cloudfront = regex("[a-z0-9]+\\.cloudfront\\.net",
+  one([for s in aws_amplify_domain_association.site.sub_domain : s.dns_record if s.prefix == ""]))
+}
+
+# A and AAAA aliases, not CNAMEs: a zone apex cannot hold a CNAME, and an alias
+# costs nothing to resolve. AAAA so IPv6-only clients can reach the site.
+#
+# allow_overwrite because Amplify can write these same records itself when the
+# zone is in the same account. Either way they end up identical, and owned
+# here.
+resource "aws_route53_record" "site" {
+  for_each = {
+    for pair in setproduct([var.domain_name, "www.${var.domain_name}"], ["A", "AAAA"]) :
+    "${pair[0]} ${pair[1]}" => { name = pair[0], type = pair[1] }
+  }
+
+  zone_id         = data.aws_route53_zone.main.zone_id
+  name            = each.value.name
+  type            = each.value.type
+  allow_overwrite = true
+
+  alias {
+    name                   = local.amplify_cloudfront
+    zone_id                = "Z2FDTNDATAQYW2" # every CloudFront distribution
+    evaluate_target_health = false
   }
 }
