@@ -203,7 +203,7 @@ public class AccountSecurityService {
 		if (method == TwoFactorMethod.EMAIL) {
 			if (!user.isEmailVerified()) {
 				throw new AuthException(HttpStatus.CONFLICT,
-						"Confirm your email address first — otherwise a code sent there could lock you out.");
+						"Confirm your email address before turning on email codes.");
 			}
 			sendLoginCode(user, now);
 			return new TwoFactorSetupView(method.value(), null, null);
@@ -243,16 +243,16 @@ public class AccountSecurityService {
 		if (method == TwoFactorMethod.TOTP) {
 			secret = user.getTotpSecret();
 			if (secret == null) {
-				throw new AuthException(HttpStatus.BAD_REQUEST, "Start the setup again - nothing is pending.");
+				throw new AuthException(HttpStatus.BAD_REQUEST, "Your setup has expired. Please start again.");
 			}
 
 			step = Totp.matchingStep(secret, code, now);
 			if (step == Totp.NO_MATCH) {
-				throw new AuthException(HttpStatus.BAD_REQUEST, "That code is not right. Check the clock on your device.");
+				throw new AuthException(HttpStatus.BAD_REQUEST, "That code is incorrect. Make sure your device's time is set automatically.");
 			}
 		}
 		else if (!userTokens.redeemLoginCode(userId, code, now)) {
-			throw new AuthException(HttpStatus.BAD_REQUEST, "That code is not right, or it has expired.");
+			throw new AuthException(HttpStatus.BAD_REQUEST, "That code is incorrect or has expired.");
 		}
 
 		user.enableTwoFactor(method, secret);
@@ -287,7 +287,7 @@ public class AccountSecurityService {
 		requirePassword(user, password, now);
 
 		if (!user.isTwoFactorEnabled()) {
-			throw new AuthException(HttpStatus.CONFLICT, "Two-factor authentication is not turned on.");
+			throw new AuthException(HttpStatus.CONFLICT, "Two-factor sign-in is not turned on.");
 		}
 		return recoveryCodes.regenerate(userId);
 	}
@@ -329,9 +329,12 @@ public class AccountSecurityService {
 		rateLimiter.check("password:user:" + user.getId(), LoginRateLimiter.LOGIN_PER_EMAIL,
 				LoginRateLimiter.LOGIN_WINDOW, now);
 
+		// 403, not 401. The session is valid; a 401 here reads to the web client
+		// as an expired token, so it refreshes and re-sends the same wrong
+		// password - spending two of the five tries below on every mistype.
 		if (password == null || !AuthRequests.fitsBcrypt(password)
 				|| !passwords.matches(password, user.getPasswordHash())) {
-			throw new AuthException(HttpStatus.UNAUTHORIZED, "That password is incorrect.");
+			throw new AuthException(HttpStatus.FORBIDDEN, "That password is incorrect.");
 		}
 		rateLimiter.clear("password:user:" + user.getId());
 	}

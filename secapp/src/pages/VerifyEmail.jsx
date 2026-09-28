@@ -54,8 +54,7 @@ export default function VerifyEmail() {
         </div>
         <h1 className="text-3xl font-black text-comptia-charcoal mt-1">Email confirmed</h1>
         <p className="text-slate-600 mt-2">
-          You can now reset your password if you ever lose it, and turn on two-factor sign-in from
-          your account page.
+          You can now reset your password if needed and turn on two-factor sign-in.
         </p>
         <div className="flex flex-wrap gap-3 mt-6">
           <Link to="/account">
@@ -91,9 +90,8 @@ export default function VerifyEmail() {
           : error}
       </p>
       <p className="text-slate-600 mt-4 text-sm">
-        Sign in and use <span className="font-semibold">Resend confirmation</span> on your account
-        page to get a fresh link. Nothing about your studying is affected either way — every quiz
-        works exactly as before.
+        To get a new link, sign in and select{' '}
+        <span className="font-semibold">Resend confirmation</span> in your account settings.
       </p>
       <Link to="/account" className="inline-block mt-6">
         <Button className="bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-6 rounded-lg">

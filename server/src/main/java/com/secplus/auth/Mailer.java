@@ -63,22 +63,22 @@ public class Mailer {
 				%s/verify-email?token=%s
 
 				The link works for 24 hours. If you did not create an account,
-				ignore this - nothing will happen.
+				you can ignore this email.
 				""".formatted(baseUrl, token));
 	}
 
 	@Async
 	public void sendPasswordReset(String to, String token) {
 		send(to, "Reset your password", """
-				Someone asked to reset the password for this account.
+				We received a request to reset the password for your account.
 
 				%s/reset-password?token=%s
 
-				The link works for one hour and can only be used once. Signing in
-				anywhere else will be ended when the password changes.
+				The link works for one hour and can only be used once. Changing
+				your password signs you out on all devices.
 
-				If this was not you, nothing has happened yet and you can ignore
-				this email.
+				If you did not request this, you can ignore this email. Your
+				password will not change.
 				""".formatted(baseUrl, token));
 	}
 
@@ -89,9 +89,8 @@ public class Mailer {
 
 				It expires in ten minutes and can only be used once.
 
-				If you were not trying to sign in, someone has your password.
-				Change it - the code alone will not let them in, which is the
-				point of the second step.
+				If you did not try to sign in, someone may know your password.
+				Reset it from the sign-in page.
 				""".formatted(code));
 	}
 

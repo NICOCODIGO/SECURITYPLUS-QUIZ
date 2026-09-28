@@ -168,6 +168,10 @@ measure but because a mock reveals nothing until submit, so the client has no us
 The first four are **public**, because they are reached by someone who cannot sign in — that
 is the point of them. Each carries its own single-use, expiring token and its own rate limit.
 
+A wrong password on the last two is **403, not 401**. The session is valid; the web client
+treats any 401 on a signed-in request as an expired token, refreshes and re-sends, which would
+submit every mistyped password twice against its five-try limit.
+
 `verify-email` and `reset-password` are **POST, not GET**, even though both are reached from a
 link. The email links to the SPA, which then calls the API. A GET endpoint would be fetched by
 the link scanners some mail providers run, spending the token before the person ever clicked.

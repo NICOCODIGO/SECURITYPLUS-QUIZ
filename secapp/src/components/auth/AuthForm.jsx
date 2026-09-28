@@ -101,8 +101,8 @@ export default function AuthForm({ mode }) {
       <div className="max-w-md mx-auto py-10 px-4">
         <h1 className="text-3xl font-black text-comptia-charcoal">Accounts aren&apos;t available</h1>
         <p className="text-slate-600 mt-2">
-          This build has no server configured, so there&apos;s nothing to sign in to. The domain
-          quizzes and the mock exam still work — results just aren&apos;t saved.
+          Sign-in isn&apos;t available on this version of the site. Quizzes and the mock exam still
+          work, but results won&apos;t be saved.
         </p>
         <Link to="/lessons" className="inline-block mt-6">
           <Button className="bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-6 rounded-lg">
@@ -121,7 +121,7 @@ export default function AuthForm({ mode }) {
         <p className="text-slate-600 mt-2">
           {method === 'totp'
             ? 'Open your authenticator app and enter the six-digit code it shows.'
-            : `We sent a six-digit code to ${email}. It expires in ten minutes.`}
+            : `We've emailed a 6-digit code to ${email}. It expires in 10 minutes.`}
         </p>
 
         <Card className="border border-slate-200 shadow-sm mt-6">
@@ -242,7 +242,7 @@ export default function AuthForm({ mode }) {
                   onChange={(event) => setDisplayName(event.target.value)}
                 />
                 {/* Nothing here is comparative, so say where it shows. */}
-                <p className="text-xs text-slate-500">Only ever shown back to you.</p>
+                <p className="text-xs text-slate-500">Only visible to you.</p>
               </div>
             )}
 

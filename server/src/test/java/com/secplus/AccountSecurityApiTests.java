@@ -455,6 +455,43 @@ class AccountSecurityApiTests {
 	 * this has to be refused as too long - not accepted and silently cut, and
 	 * not a 500 from the encoder.
 	 */
+	/**
+	 * A wrong password is a 403, never a 401.
+	 *
+	 * The session is fine - only the confirmation failed. The web client
+	 * answers any 401 on a signed-in request by refreshing and re-sending, so a
+	 * 401 here would submit every mistyped password twice and spend the
+	 * five-try budget at double speed.
+	 */
+	@Test
+	void turningTwoFactorOffNeedsThePasswordAndAWrongOneIsForbidden() throws Exception {
+		String email = freshEmail();
+		String bearer = "Bearer " + token(register(email));
+		access.verify(email);
+		access.enableEmailTwoFactor(email);
+
+		for (String path : new String[] { "/api/v1/auth/2fa/disable", "/api/v1/auth/2fa/recovery-codes" }) {
+			mvc.perform(post(path)
+					.header("Authorization", bearer)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{"password":"not-the-password"}"""))
+				.andExpect(status().isForbidden());
+		}
+		mvc.perform(get("/api/v1/auth/2fa").header("Authorization", bearer))
+			.andExpect(jsonPath("$.method").value("email"));
+
+		mvc.perform(post("/api/v1/auth/2fa/disable")
+				.header("Authorization", bearer)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"password":"correct-horse-battery"}"""))
+			.andExpect(status().isNoContent());
+		mvc.perform(get("/api/v1/auth/2fa").header("Authorization", bearer))
+			.andExpect(jsonPath("$.method").doesNotExist())
+			.andExpect(jsonPath("$.recoveryCodesRemaining").value(0));
+	}
+
 	@Test
 	void aPasswordOverBcryptsByteLimitIsRefusedNotTruncated() throws Exception {
 		mvc.perform(post("/api/v1/auth/register")

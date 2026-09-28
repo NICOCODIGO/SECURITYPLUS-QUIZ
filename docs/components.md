@@ -71,6 +71,14 @@ Plain uppercase text: `text-xs font-bold uppercase tracking-[0.18em]`. **Not pil
 `HeroBadge` pill component used to sit above every heading, including in both heroes where it
 just restated the headline. It was removed rather than restyled — don't reintroduce it.
 
+### Status badges are not section labels
+
+The account page's settings cards (`secapp/src/pages/Account.jsx`) carry a small badge beside
+the card title — **On** / **Off**, **Confirmed** / **Not confirmed**. That is a status marker,
+not the label pill ruled out above. It uses the emerald/amber pair from
+`secapp/src/lib/performanceStatus.js` and always pairs the colour with a word, never colour
+alone.
+
 ## Layout mechanics
 
 - Pages build full-width bands with the `.full-bleed` utility (`secapp/src/index.css`),

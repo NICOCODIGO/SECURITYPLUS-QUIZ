@@ -211,7 +211,7 @@ public class AuthService {
 			.orElseThrow(() -> new AuthException(HttpStatus.UNAUTHORIZED, BAD_CREDENTIALS));
 
 		if (!codeAccepted(user, code, now)) {
-			throw new AuthException(HttpStatus.UNAUTHORIZED, "That code is not right, or it has expired.");
+			throw new AuthException(HttpStatus.UNAUTHORIZED, "That code is incorrect or has expired.");
 		}
 
 		// Correct: spend the challenge so it cannot be replayed, and stop

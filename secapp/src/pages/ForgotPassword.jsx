@@ -49,12 +49,12 @@ export default function ForgotPassword() {
         </div>
         <h1 className="text-3xl font-black text-comptia-charcoal mt-1">Reset link sent</h1>
         <p className="text-slate-600 mt-2">
-          If <span className="font-semibold">{email}</span> has an account, a reset link is on its
-          way. It works for one hour and can only be used once.
+          If an account exists for <span className="font-semibold">{email}</span>, we&apos;ve sent
+          a reset link. It expires in one hour and can be used once.
         </p>
         <p className="text-slate-600 mt-4 text-sm">
-          Nothing arrived? Check spam, and make sure you confirmed your email address when you
-          signed up — an unconfirmed address cannot be reset.
+          Didn&apos;t receive it? Check your spam folder. Reset links can only be sent to confirmed
+          email addresses.
         </p>
         <Link to="/login" className="inline-block mt-6">
           <Button className="bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-6 rounded-lg">
@@ -70,8 +70,7 @@ export default function ForgotPassword() {
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-red-600">Account recovery</p>
       <h1 className="text-3xl font-black text-comptia-charcoal mt-1">Forgot your password?</h1>
       <p className="text-slate-600 mt-2">
-        Enter your email and we&apos;ll send a link to set a new one. Your study data stays exactly
-        where it is.
+        Enter your email address and we&apos;ll send you a link to reset your password.
       </p>
 
       <Card className="border border-slate-200 shadow-sm mt-6">
@@ -113,7 +112,7 @@ export default function ForgotPassword() {
           </form>
 
           <p className="text-sm text-slate-600 text-center mt-5">
-            Remembered it?{' '}
+            Remember your password?{' '}
             <Link to="/login" className="font-bold text-red-600 hover:text-red-700 underline">
               Sign in
             </Link>

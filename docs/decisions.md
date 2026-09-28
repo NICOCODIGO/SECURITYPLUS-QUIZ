@@ -62,6 +62,14 @@ Still on the page and needing care:
   is **untrue today** — `MockExam` draws a flat random 90. Phase 4 makes it true. Don't build
   more copy on top of it until then.
 
+## Account pages
+
+| Removed | Why | Do not |
+|---|---|---|
+| **Conversational asides in account copy** ("…which is the point", "so a borrowed session cannot") | Read like a chat message, not a product. Sign-in, account and account-email copy is plain and professional: say what happens, not why we built it that way | Explain design reasoning in UI text or emails — it belongs in code comments |
+| **SMS as a 2FA method** — considered, not built | Needs an SMS provider, US number registration, a per-message cost and another VPC endpoint (no NAT). SMS is also the weakest second factor (SIM swapping — an SY0-701 topic). The real problem was that "email codes" was unclear, so the method tiles now describe each option | Add SMS 2FA without that conversation |
+| **"Off" in slate grey** | Too subtle for a security setting. Status is an emerald **On** / amber **Off** badge beside the title — amber because 2FA is optional, and red is the brand and the destructive button | Make "off" red, or drop the word and leave colour alone to carry it |
+
 ## Stack
 
 | Abandoned | In favour of |

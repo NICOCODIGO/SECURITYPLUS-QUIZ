@@ -4,8 +4,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Info, Loader2 } from 'lucide-react';
 import { resetPassword } from '@/auth/authApi';
+import { useAuth } from '@/auth/AuthContext';
 
 /** Matches the server. BCrypt truncates at 72 bytes, so a longer one would be silently cut. */
 const MAX_PASSWORD = 72;
@@ -23,6 +24,7 @@ export default function ResetPassword() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const token = params.get('token');
+  const { status, signOut } = useAuth();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -42,6 +44,9 @@ export default function ResetPassword() {
     setBusy(true);
     try {
       await resetPassword(token, password);
+      // The server has already ended every session, this one included. Clear
+      // ours too, or the nav keeps showing an account that is signed out.
+      if (status === 'authenticated') await signOut();
       setDone(true);
     } catch (submitError) {
       setError(
@@ -77,8 +82,7 @@ export default function ResetPassword() {
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-green-700">All set</p>
         <h1 className="text-3xl font-black text-comptia-charcoal mt-1">Password changed</h1>
         <p className="text-slate-600 mt-2">
-          You&apos;ve been signed out everywhere else, which is the point — if someone else had
-          access, they no longer do.
+          Your password has been changed. You&apos;ll need to sign in again.
         </p>
         <Button
           onClick={() => navigate('/login', { replace: true })}
@@ -94,9 +98,7 @@ export default function ResetPassword() {
     <div className="max-w-md mx-auto py-10 px-4">
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-red-600">Account recovery</p>
       <h1 className="text-3xl font-black text-comptia-charcoal mt-1">Choose a new password</h1>
-      <p className="text-slate-600 mt-2">
-        This also signs you out on every other device.
-      </p>
+      <p className="text-slate-600 mt-2">Enter a new password for your account.</p>
 
       <Card className="border border-slate-200 shadow-sm mt-6">
         <CardContent className="p-6">
@@ -144,6 +146,13 @@ export default function ResetPassword() {
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
               />
+            </div>
+
+            {/* The server revokes every refresh token, this browser's included
+                (AuthController.resetPassword), so "all devices" is exact. */}
+            <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
+              <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-500" />
+              <span>Changing your password signs you out on all devices.</span>
             </div>
 
             <Button
