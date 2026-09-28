@@ -22,6 +22,15 @@ Registered in `secapp/src/App.jsx`:
 capitalized form. Route matching is case-insensitive (React Router default), so `/Lessons`
 still hits `path="/lessons"`.
 
+### Link previews
+
+`secapp/index.html` carries the Open Graph and Twitter tags that give a shared
+certucation.click link its title, description and image. The image is
+`secapp/public/og-image.jpg`, a copy of the README's `.github/assets/social-preview.jpg` — the
+same file is uploaded by hand as the repo's social preview (GitHub → Settings → Social preview),
+because GitHub has no API for it. Change all three together. `og:image` must be an absolute URL;
+crawlers don't resolve relative ones.
+
 ### `createPageUrl` returns a *relative* path
 
 `createPageUrl()` in `secapp/src/lib/utils.js` returns `"TakeQuiz"`, not `"/TakeQuiz"`. That
