@@ -125,9 +125,13 @@ resource "aws_amplify_app" "web" {
   # The amplifyapp.com address every Amplify app has cannot be removed, so it
   # sends people to the real one. First, so it wins over the /api proxy too:
   # nothing should use that host once the domain is attached.
+  #
+  # Host-only sources, no `/<*>`: Amplify stores a `https://host/<*>` rule but
+  # never matches it (checked: 200, not 301). A bare-host source is what it
+  # treats as a whole-domain redirect.
   custom_rule {
-    source = "https://${var.amplify_default_host}/<*>"
-    target = "https://${var.domain_name}/<*>"
+    source = "https://${var.amplify_default_host}"
+    target = "https://${var.domain_name}"
     status = "301"
   }
 
@@ -135,8 +139,8 @@ resource "aws_amplify_app" "web" {
   # later opening the apex would otherwise look like being signed out. Email
   # links are built from APP_BASE_URL, the apex, so they never pass through it.
   custom_rule {
-    source = "https://www.${var.domain_name}/<*>"
-    target = "https://${var.domain_name}/<*>"
+    source = "https://www.${var.domain_name}"
+    target = "https://${var.domain_name}"
     status = "301"
   }
 
