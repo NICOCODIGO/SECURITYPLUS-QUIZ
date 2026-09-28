@@ -12,25 +12,35 @@ Git carries the code. It deliberately does not carry installed tools or credenti
 | Node 22+, Java 25 | `npm run dev`, `./gradlew bootRun`, `./verify.sh` | optional if you only use `docker compose up` from the root |
 | `aws configure` | deploying | credentials live in `~/.aws`, never in the repo |
 
-After cloning, run `./scripts/doctor.sh`. It checks the tools above and installs the front-end
-packages. Don't copy `node_modules` between machines: some packages ship OS-specific binaries.
-Terraform state is in S3 (see [infra/README.md](../infra/README.md)), so there is no state file to
-carry over.
+After cloning, run `./scripts/doctor.sh`. It checks the tools above, installs the front-end
+packages, and creates `secapp/.env.local` (`VITE_API_URL=http://localhost:8080`) if it is missing —
+git ignores that file, and without it the dev server silently runs with no API and no sign-in.
+Don't copy `node_modules` between machines: some packages ship OS-specific binaries. Terraform
+state is in S3 (see [infra/README.md](../infra/README.md)), so there is no state file to carry over.
+
+Everything else git ignores rebuilds itself: `node_modules` (doctor.sh), Gradle's caches and
+`server/build/` (the first `./gradlew` run), `infra/.terraform/` (`deploy.sh` runs `init`).
+
+**On a Mac:** the same tools, from Homebrew or their installers; the scripts run in the normal
+Terminal. On Apple Silicon, `deploy.sh` builds the API image for `linux/amd64` on purpose —
+App Runner runs x86, and an arm64 image would push fine and then fail to start. That build runs
+under emulation, so it is slower there; that is expected.
 
 ### Switching machines
 
 - **Leaving:** commit, then **Sync Changes** in VS Code's Source Control panel (push and pull
-  in one click).
-- **Arriving:** **Sync Changes**, then `./scripts/doctor.sh` (Git Bash on Windows). It fails if
-  GitHub has commits you haven't pulled or Docker isn't running, and reinstalls front-end
-  packages when a pull changed `package-lock.json`.
+  in one click) — or **Push origin** in GitHub Desktop.
+- **Arriving:** **Sync Changes** (or **Fetch/Pull origin** in GitHub Desktop), then
+  `./scripts/doctor.sh` (Git Bash on Windows, Terminal on a Mac). It fails if GitHub has commits
+  you haven't pulled or Docker isn't running, and reinstalls front-end packages when a pull
+  changed `package-lock.json`.
 
 **History was rewritten on 2026-09-27** to take personal email addresses out of commit metadata,
-because the repository is public. A clone made before that date must **not** use Sync Changes:
-it would merge the old history, addresses included, straight back in. Re-clone it, or run
-`git fetch` then `git reset --hard origin/<branch>` for each branch (after saving any local
-work). Commit as `NICOCODIGO <153687367+NICOCODIGO@users.noreply.github.com>` — set it per
-clone with `git config user.email`.
+because the repository is public. A clone made before that date must **not** use Sync Changes or
+GitHub Desktop's Pull: it would merge the old history, addresses included, straight back in.
+Re-clone it, or run `git fetch` then `git reset --hard origin/<branch>` for each branch (after
+saving any local work). Commit as `NICOCODIGO <153687367+NICOCODIGO@users.noreply.github.com>` —
+set it per clone with `git config user.email`, or in GitHub Desktop under Settings → Git.
 
 Not carried by git, on purpose: editor settings and extensions (VS Code's project settings
 folder is gitignored; turn on VS Code **Settings Sync** instead), and Claude Code's memory, which is per machine. Project

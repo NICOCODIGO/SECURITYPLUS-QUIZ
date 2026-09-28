@@ -110,6 +110,18 @@ else
   fi
 fi
 
+# The local API address. git ignores it (secapp/.gitignore: *.local), so a fresh
+# clone has none and the dev server quietly runs with no API: the bundled
+# question bank, no sign-in, nothing recorded - which looks like a broken
+# account feature, not a missing file. Created with the same value the other
+# machines use; delete it to work API-off on purpose.
+if [ -f secapp/.env.local ]; then
+  pass "secapp/.env.local present ($(grep -m1 '^VITE_API_URL=' secapp/.env.local || echo 'no VITE_API_URL'))"
+else
+  printf 'VITE_API_URL=http://localhost:8080\n' > secapp/.env.local
+  pass "created secapp/.env.local (VITE_API_URL=http://localhost:8080, for './gradlew bootRun')"
+fi
+
 # ------------------------------------------------------------------ deploy --
 
 section "Deploying (not needed for development)"

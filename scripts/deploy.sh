@@ -155,7 +155,13 @@ step "2/4  Building and pushing the API image"
 
 # Built from server/, matching how CI builds it, so a green CI run means this
 # image builds too.
-docker build -t "$ECR_URL:latest" ./server
+#
+# --platform linux/amd64 always: App Runner runs x86 containers, and Docker
+# otherwise builds for the machine it is on. From an Apple Silicon Mac that is
+# an arm64 image, which pushes fine and then fails to start on App Runner
+# ("exec format error") - after the rest of the deploy has gone through. On an
+# ARM Mac this builds under emulation, so it is slower; that is expected.
+docker build --platform linux/amd64 -t "$ECR_URL:latest" ./server
 docker push "$ECR_URL:latest"
 
 step "3/4  Applying the rest of the stack"
