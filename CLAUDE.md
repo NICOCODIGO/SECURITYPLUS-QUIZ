@@ -10,8 +10,9 @@ on demand — read the one or two files your task needs rather than everything.
 Free study platform for the CompTIA Security+ SY0-701 exam. Front end: React 19 + Vite 7 +
 Tailwind 3 + shadcn/ui, plain **JSX, not TypeScript** (`secapp/`). Back end: Java 25 +
 Spring Boot 4.1 + PostgreSQL (`server/`). **Deployed and live at
-https://certucation.click** — question bank and accounts are built; cross-device
-sync (phase 3) and resumable mock exams (phase 4, the only thing DynamoDB is for) are not.
+https://certucation.click** — question bank, accounts (with verification, reset and optional
+2FA) and cross-device sync are built; resumable mock exams (phase 4, the only thing DynamoDB is
+for) are not.
 
 ## Read this first
 
@@ -25,6 +26,7 @@ sync (phase 3) and resumable mock exams (phase 4, the only thing DynamoDB is for
 | Schema, migrations, DynamoDB | [docs/database.md](docs/database.md) |
 | Docker, CI, env vars, deploys | [docs/devops.md](docs/devops.md) |
 | Questions, objectives, rationales | [docs/content.md](docs/content.md) |
+| New to the project, or explaining it plainly | [docs/guide/](docs/guide/README.md) — big picture, data, every file, everyday tasks, glossary |
 
 `decisions.md` records what was built and deliberately removed. Most of it looks like an
 obvious missing feature. It isn't.
