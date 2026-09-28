@@ -224,21 +224,18 @@ locals {
   one([for s in aws_amplify_domain_association.site.sub_domain : s.dns_record if s.prefix == ""]))
 }
 
-# A and AAAA aliases, not CNAMEs: a zone apex cannot hold a CNAME, and an alias
-# costs nothing to resolve. AAAA so IPv6-only clients can reach the site.
+# The apex: A and AAAA aliases, because a zone apex cannot hold a CNAME, and an
+# alias costs nothing to resolve. AAAA so IPv6-only clients can reach the site.
 #
-# allow_overwrite because Amplify can write these same records itself when the
-# zone is in the same account. Either way they end up identical, and owned
-# here.
+# allow_overwrite on both records here because Amplify writes records into a
+# Route 53 zone in its own account the moment the domain is associated. These
+# adopt whatever it wrote rather than failing on it.
 resource "aws_route53_record" "site" {
-  for_each = {
-    for pair in setproduct([var.domain_name, "www.${var.domain_name}"], ["A", "AAAA"]) :
-    "${pair[0]} ${pair[1]}" => { name = pair[0], type = pair[1] }
-  }
+  for_each = { for type in ["A", "AAAA"] : "${var.domain_name} ${type}" => type }
 
   zone_id         = data.aws_route53_zone.main.zone_id
-  name            = each.value.name
-  type            = each.value.type
+  name            = var.domain_name
+  type            = each.value
   allow_overwrite = true
 
   alias {
@@ -246,4 +243,17 @@ resource "aws_route53_record" "site" {
     zone_id                = "Z2FDTNDATAQYW2" # every CloudFront distribution
     evaluate_target_health = false
   }
+}
+
+# www: a CNAME, because that is what Amplify creates for it - and a name that
+# holds a CNAME can hold nothing else, so A/AAAA aliases here are refused
+# ("conflicting RRSet of type CNAME"). TTL matches Amplify's so adopting it
+# changes nothing.
+resource "aws_route53_record" "www" {
+  zone_id         = data.aws_route53_zone.main.zone_id
+  name            = "www.${var.domain_name}"
+  type            = "CNAME"
+  ttl             = 500
+  records         = [local.amplify_cloudfront]
+  allow_overwrite = true
 }
