@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
 #
-# Deploys the whole stack. Run from the repo root: ./scripts/deploy.sh
+# Deploys the infrastructure and the API. Run from the repo root: ./scripts/deploy.sh
 #
-# The ordering is not arbitrary. VITE_API_URL is baked into the front end at
-# BUILD time and apiClient.js needs it absolute — isConfigured() is false when
-# it is empty, and new URL() rejects a relative base. So the SPA cannot be built
-# until CloudFront exists and its domain is known. Hence: infrastructure first,
-# read the domain, then build.
+# The FRONT END is not built here. Amplify builds and serves it, and a push to
+# `main` is what ships it (infra/amplify.tf). This script only asks Amplify for
+# a build at the end, because Amplify applies rule and environment changes
+# (redirects, VITE_API_URL) only when it next deploys.
 #
-# The second apply exists for the same reason in the other direction: App Runner
-# wants the CloudFront domain for CORS_ALLOWED_ORIGINS, and CloudFront needs App
-# Runner as an origin. See infra/variables.tf.
+# When a change touches both halves, run this BEFORE merging to main: otherwise
+# Amplify ships a front end that calls endpoints the running API does not have.
 
 set -euo pipefail
 
@@ -42,7 +40,7 @@ else
       -e AWS_CONFIG_FILE=/aws/config -e AWS_SHARED_CREDENTIALS_FILE=/aws/credentials \
       -e AWS_PROFILE -e AWS_REGION -e AWS_DEFAULT_REGION \
       -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN \
-      -e TF_VAR_github_access_token -e TF_VAR_amplify_api_url -e TF_VAR_extra_cors_origins \
+      -e TF_VAR_extra_cors_origins \
       "$TF_IMAGE" "$@"
   }
 fi
@@ -100,10 +98,10 @@ else
   tf -chdir=infra init -input=false -reconfigure -backend-config="bucket=$STATE_BUCKET"
 fi
 
-# The Amplify app (infra/amplify.tf) must either be in state already, or be
-# creatable - which needs a GitHub token. An app made in the console first is
-# neither: applying would try to create a second one. Checked here, before
-# anything ships, rather than failing at the apply after the image is pushed.
+# The Amplify app (infra/amplify.tf) was created in the console and imported,
+# and Terraform cannot create one without a GitHub token. So it must already be
+# in state. Checked here, before anything ships, rather than failing at the
+# apply after the image is pushed.
 if ! tf -chdir=infra state list 2>/dev/null | grep -qx 'aws_amplify_app.web'; then
   EXISTING_APP=$("$AWS" amplify list-apps --region "$REGION" \
     --query "apps[?contains(repository, 'SECURITYPLUS-QUIZ')].appId | [0]" --output text 2>/dev/null || true)
@@ -111,25 +109,26 @@ if ! tf -chdir=infra state list 2>/dev/null | grep -qx 'aws_amplify_app.web'; th
     echo "Amplify app $EXISTING_APP exists but Terraform doesn't know about it. Import it once:" >&2
     echo "  terraform -chdir=infra import aws_amplify_app.web $EXISTING_APP" >&2
     echo "  terraform -chdir=infra import aws_amplify_branch.main $EXISTING_APP/main" >&2
-    exit 1
-  elif [ -z "${TF_VAR_github_access_token:-}" ]; then
-    echo "The Amplify app doesn't exist yet, and creating it needs a GitHub token." >&2
-    echo "Set TF_VAR_github_access_token and rerun - see infra/README.md, 'Amplify'." >&2
-    exit 1
+  else
+    echo "No Amplify app for this repo. Create it in the Amplify console, then import it" >&2
+    echo "- see infra/README.md, 'Amplify'." >&2
   fi
+  exit 1
 fi
 
 # App Runner rejects any update while a rollout is in flight
 # (InvalidStateException: OPERATION_IN_PROGRESS), so a deploy started while the
-# previous one is still settling fails partway - after the image is pushed but
-# before the front end ships. Wait it out rather than half-deploying.
+# previous one is still settling fails partway, after the image is pushed.
+# Wait it out rather than half-deploying.
 wait_for_apprunner() {
   local arn status waited=0
-  arn=$("$AWS" apprunner list-services --region "$REGION"     --query "ServiceSummaryList[?ServiceName=='secplus'].ServiceArn | [0]" --output text 2>/dev/null) || return 0
+  arn=$("$AWS" apprunner list-services --region "$REGION" \
+    --query "ServiceSummaryList[?ServiceName=='secplus'].ServiceArn | [0]" --output text 2>/dev/null) || return 0
   [ -z "$arn" ] || [ "$arn" = "None" ] && return 0
 
   while [ "$waited" -lt 900 ]; do
-    status=$("$AWS" apprunner describe-service --service-arn "$arn" --region "$REGION"       --query 'Service.Status' --output text 2>/dev/null) || return 0
+    status=$("$AWS" apprunner describe-service --service-arn "$arn" --region "$REGION" \
+      --query 'Service.Status' --output text 2>/dev/null) || return 0
     case "$status" in
       OPERATION_IN_PROGRESS)
         [ "$waited" -eq 0 ] && echo "App Runner is mid-rollout; waiting for it to settle..."
@@ -146,11 +145,11 @@ wait_for_apprunner
 # creating the service points it at <repo>:latest and it fails outright if it
 # cannot pull. So the repository is targeted first, filled, and only then does
 # the rest of the stack come up. On later runs this is a no-op.
-step "1/6  Creating the image repository"
+step "1/4  Creating the image repository"
 tf -chdir=infra apply -input=false -auto-approve -target=aws_ecr_repository.api
 ECR_URL=$(tf -chdir=infra output -raw ecr_repository_url)
 
-step "2/6  Building and pushing the API image"
+step "2/4  Building and pushing the API image"
 "$AWS" ecr get-login-password --region "$REGION" \
   | docker login --username AWS --password-stdin "${ECR_URL%%/*}"
 
@@ -159,37 +158,11 @@ step "2/6  Building and pushing the API image"
 docker build -t "$ECR_URL:latest" ./server
 docker push "$ECR_URL:latest"
 
-step "3/6  Provisioning the rest of the stack"
-# Pass site_url through if a previous run already produced it. Without this,
-# this apply resets CORS_ALLOWED_ORIGINS to the placeholder and step 4 sets it
-# straight back - two App Runner config changes per deploy, each triggering its
-# own rollout, and the second racing the first into OPERATION_IN_PROGRESS.
-# Empty on the very first run, when the distribution does not exist yet.
-KNOWN_SITE_URL=$(tf -chdir=infra output -raw site_url 2>/dev/null || true)
-if [ -n "$KNOWN_SITE_URL" ]; then
-  tf -chdir=infra apply -input=false -auto-approve -var="site_url=$KNOWN_SITE_URL"
-else
-  tf -chdir=infra apply -input=false -auto-approve
-fi
+step "3/4  Applying the rest of the stack"
+tf -chdir=infra apply -input=false -auto-approve
 
 SITE_URL=$(tf -chdir=infra output -raw site_url)
-BUCKET=$(tf -chdir=infra output -raw site_bucket)
-DIST_ID=$(tf -chdir=infra output -raw distribution_id)
 SERVICE_ARN=$(tf -chdir=infra output -raw apprunner_service_arn)
-
-echo "site:   $SITE_URL"
-echo "bucket: $BUCKET"
-
-# ------------------------------------------------------------------ cors fix --
-
-step "4/6  Pointing the API's CORS origin at the real domain"
-# Only the first run has anything to do here; later runs already passed the
-# real value at step 3.
-if [ "$SITE_URL" != "$KNOWN_SITE_URL" ]; then
-  tf -chdir=infra apply -input=false -auto-approve -var="site_url=$SITE_URL"
-else
-  echo "CORS origin already correct - nothing to change"
-fi
 
 # Pushing a new :latest changes no Terraform attribute, and auto-deploy is off,
 # so without this a redeploy would upload an image the service never picks up —
@@ -199,49 +172,21 @@ fi
   && echo "rollout triggered" \
   || echo "already deploying — skipping"
 
-# Amplify rebuilds by itself on every push to main, but not when its settings
-# change (VITE_API_URL, say), and not when the app is first created. So ask
-# for a build of main's latest commit - never this machine's working tree.
-# Tolerated failure: one is refused while another is already running.
+# A build of main's latest commit - never this machine's working tree - so any
+# rule or VITE_API_URL change applied above takes effect. Tolerated failure: one
+# is refused while another is already running - if a change here needs to go
+# live, start a RELEASE by hand once that build finishes.
 AMPLIFY_APP_ID=$(tf -chdir=infra output -raw amplify_app_id)
 "$AWS" amplify start-job --app-id "$AMPLIFY_APP_ID" --branch-name main --job-type RELEASE \
   --region "$REGION" >/dev/null 2>&1 \
-  && echo "Amplify build of main started: $(tf -chdir=infra output -raw amplify_branch_url)" \
+  && echo "Amplify build of main started" \
   || echo "Amplify is already building - skipping"
-
-# ---------------------------------------------------------------------- web --
-
-step "5/6  Building and uploading the front end"
-(
-  cd secapp
-  # `npm install`, not `npm ci`, and deliberately. `npm ci` deletes
-  # node_modules before reinstalling, which on Windows fails outright if
-  # anything holds a binary open - a running Vite dev server keeps
-  # esbuild.exe locked, and having one running while you deploy is entirely
-  # normal. It failed here once *after* the infrastructure had already been
-  # updated, leaving a half-deleted node_modules that broke local development
-  # too. `npm install` reconciles in place, so a locked file costs nothing.
-  # CI still uses `npm ci`, where the environment is clean and nothing is held.
-  npm install --no-audit --no-fund
-  VITE_API_URL="$SITE_URL" npm run build
-)
-
-# Hashed assets get a long cache; index.html must not, or a deploy ships new
-# assets that nobody is told about until their cache expires.
-"$AWS" s3 sync secapp/dist "s3://$BUCKET" --delete \
-  --exclude index.html --cache-control "public,max-age=31536000,immutable"
-"$AWS" s3 cp secapp/dist/index.html "s3://$BUCKET/index.html" \
-  --cache-control "no-cache,must-revalidate"
-
-step "6/6  Invalidating the CDN"
-"$AWS" cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*" >/dev/null
 
 # App Runner rolls out asynchronously, so the script finishing does NOT mean
 # the new image is serving. Waiting here matters more than it sounds: testing
 # straight after a deploy otherwise hits the *old* container, and the result
 # looks exactly like the change not working.
-echo
-echo "Waiting for the API rollout to finish..."
+step "4/4  Waiting for the API rollout to finish"
 wait_for_apprunner
 
 printf '\n\033[32mDeployed and live:\033[0m %s\n' "$SITE_URL"

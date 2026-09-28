@@ -6,7 +6,7 @@ dashboard.
 
 **Live: https://certucation.click**
 
-> **Status:** deployed and working. React front end on S3 + CloudFront, Spring Boot API on App
+> **Status:** deployed and working. React front end on AWS Amplify, Spring Boot API on App
 > Runner, PostgreSQL on RDS, accounts with rotating refresh tokens, and quiz history that
 > follows your account between devices. Resumable mock exams are the next piece — see
 > [Roadmap](#roadmap). The app also runs with the API switched off, straight from a clean
@@ -151,19 +151,19 @@ react-markdown. Plain JSX, not TypeScript.
 **Back end** — Java 25, Spring Boot 4.1, Spring Security, Spring Data JPA, Flyway,
 PostgreSQL, DynamoDB, Gradle. Tested with JUnit 5 and Testcontainers.
 
-**Deployment** {D} live on AWS, defined in [`infra/`](infra/) with Terraform and shipped by
-`./scripts/deploy.sh`. React build on S3, API as a container in ECR running on App Runner,
-PostgreSQL on RDS in a private subnet, secrets in SSM Parameter Store, CI on GitHub Actions.
+**Deployment** — live on AWS, defined in [`infra/`](infra/) with Terraform. The front end is on
+AWS Amplify, which builds and ships it on every push to `main`; the API is a container in ECR
+running on App Runner, shipped by `./scripts/deploy.sh`. PostgreSQL on RDS in a private subnet,
+secrets in SSM Parameter Store, CI on GitHub Actions.
 
-The one design choice worth calling out: **the site and the API share a single CloudFront
-distribution**, with `/api/*` routed to App Runner and everything else to S3. That is not for
-tidiness. The refresh token is a `SameSite=Strict` cookie, so an API on its own domain would
-never receive it and every session would die fifteen minutes after sign-in {D} a failure local
-development cannot reproduce, because `localhost:5173` and `localhost:8080` count as the same
-site.
+The one design choice worth calling out: **the site and the API share a single domain**. Amplify
+serves the pages and proxies `/api/*` to App Runner. That is not for tidiness. The refresh token
+is a `SameSite=Strict` cookie, so an API on its own domain would never receive it and every
+session would die fifteen minutes after sign-in — a failure local development cannot reproduce,
+because `localhost:5173` and `localhost:8080` count as the same site.
 
-There is no NAT gateway (the API makes no outbound calls) and no DynamoDB yet (nothing uses it
-until resumable mock exams land).
+There is no NAT gateway: the API's only outbound calls are to the database and to SES for email,
+through a private endpoint. And no DynamoDB yet (nothing uses it until resumable mock exams land).
 
 ### Why Postgres *and* DynamoDB
 

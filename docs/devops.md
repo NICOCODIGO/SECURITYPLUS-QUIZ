@@ -66,8 +66,8 @@ than having it injected — Boot has no connection-details support for DynamoDB,
 | `server/Dockerfile` | **Production.** Multi-stage, `eclipse-temurin:25-jdk-alpine` → `25-jre-alpine`, non-root user, `-XX:MaxRAMPercentage=75` |
 | `secapp/Dockerfile` | **Dev server.** Runs `npm run dev`, not a production build |
 
-`secapp/` has no production image yet. Phase 6 serves the built `dist/` from S3 + CloudFront
-instead, so one may never be needed.
+`secapp/` has no production image, and needs none: Amplify builds `dist/` from `main` and serves
+it (`infra/amplify.tf`).
 
 The server image resolves dependencies in their own layer (keyed only on the build files) so
 editing source doesn't re-download everything.
@@ -96,7 +96,7 @@ Read by `server/src/main/resources/application.properties`. All have local defau
 | `AUTH_JWT_SECRET` | empty → random per start | SSM; **must** be set, see below |
 | `AUTH_COOKIE_SAME_SITE` | `Strict` | `Strict` once the API is same-domain |
 | `AUTH_COOKIE_SECURE` | `false` | `true` |
-| `AUTH_TRUST_FORWARDED_FOR` | `false` | `true` behind CloudFront |
+| `AUTH_TRUST_FORWARDED_FOR` | `false` | `true`: App Runner's proxy is the socket peer for everyone |
 | `AUTH_FORWARDED_FOR_HOPS` | `1` | `2` behind Amplify's `/api` proxy (observed, see `infra/api.tf`) |
 
 Three of those have failure modes worth knowing, because none of them look like a bug:
@@ -126,8 +126,9 @@ Three of those have failure modes worth knowing, because none of them look like 
   network. It logs a WARN saying so. In production an empty host means every verification and
   reset email silently goes nowhere.
 - **`APP_BASE_URL` pointing at the API** rather than the site produces emails whose links 404.
-  `deploy.sh` feeds both this and `CORS_ALLOWED_ORIGINS` from the `site_url` output, so they
-  cannot drift apart.
+  Terraform sets both this and `CORS_ALLOWED_ORIGINS` from `local.site_url` (`infra/main.tf`),
+  derived from the domain, so they cannot drift apart — and cannot fall back to a placeholder,
+  which the old `-var site_url` could.
 
 Locally, `spring-boot-docker-compose` overrides the datasource values with the real container
 host and port, so the defaults above are only a fallback.
@@ -138,9 +139,9 @@ quizzes and mock exam still run — but nothing is recorded, because no API mean
 so Weakest Subject and Build Your Own stay locked). It does **not** fall back to
 browser storage; that was removed deliberately. See [decisions.md](decisions.md).
 
-Because the value is compiled into the bundle, changing the domain means **rebuilding and
-reuploading the front end**, not just updating a variable. `deploy.sh` reads `site_url` and does
-this in the right order for exactly that reason.
+Because the value is compiled into the bundle, changing it means **rebuilding the front end**, not
+just updating a variable. It is set on the Amplify branch (`infra/amplify.tf`), and Amplify does
+not rebuild when an environment variable changes — `deploy.sh` starts a build for that reason.
 
 ## Ports
 
@@ -254,8 +255,8 @@ by `logging.pattern.level`:
 WARN [secplus-api,traceme123] ... RefreshTokenService : Refresh token reuse detected for user ...
 ```
 
-An inbound `X-Request-Id` is reused — CloudFront sets one, so a CloudWatch entry and an access
-log line can be joined up — otherwise one is generated. It is always echoed back on the
+An inbound `X-Request-Id` is reused — so if a proxy in front ever sets one, a CloudWatch entry and
+its access log line can be joined up — otherwise one is generated. It is always echoed back on the
 response, so someone reporting a problem can quote the id of the exact request that failed.
 Inbound values are stripped to `[A-Za-z0-9._-]` and truncated: the header is caller-supplied,
 and a newline in it would let anyone forge a log entry.
@@ -276,9 +277,11 @@ user out on each deploy.
 
 ## Domain, DNS and email
 
-Live at **https://certucation.click**. The `*.cloudfront.net` name still serves and is exposed as
-the `cloudfront_domain` output, which is worth keeping — when the custom domain misbehaves it
-tells you whether the problem is DNS or the distribution.
+Live at **https://certucation.click**, served by Amplify, and that is the only address that serves
+the site. `www.` and Amplify's own `main.<app-id>.amplifyapp.com` (the `amplify_branch_url`
+output — every Amplify app has one and it cannot be removed) both 301 to it. That redirect is also
+the quickest DNS-versus-Amplify check: if the amplifyapp address redirects but the domain fails,
+the problem is DNS.
 
 `certucation.click` was registered through Route 53, which creates the hosted zone itself. So
 `infra/dns.tf` **reads** that zone with a `data` block. Creating one would make a second zone
@@ -309,10 +312,16 @@ Avoid the console route for this. It now leads into **Mail Manager**, whose wiza
 | `mail.` MX + TXT | Custom MAIL FROM, so **SPF** aligns to our domain and not to `amazonses.com` |
 | apex TXT (SPF), `_dmarc` TXT | Policy. `p=none` — publish, do not ask anyone to reject yet |
 | 2 × validation CNAME | ACM DNS validation |
-| apex + `www` A/AAAA alias | Point at CloudFront. **Alias, not CNAME** — a zone apex cannot hold a CNAME |
+| apex A/AAAA alias | Point at Amplify's CloudFront. **Alias, not CNAME** — a zone apex cannot hold a CNAME |
+| `www` CNAME | Same target. A CNAME because that is what Amplify writes for it itself |
 
-AAAA is not optional padding: the distribution has IPv6 on by default, and an IPv6-only client
-with no AAAA record simply cannot reach the site.
+The apex and `www` records live in `infra/amplify.tf`, beside the domain association they come
+from; the rest are in `infra/dns.tf`. Amplify writes records into a zone in its own account the
+moment the domain is associated, so the Terraform ones use `allow_overwrite` to adopt them — and
+`www` has to be a CNAME, because a name holding a CNAME can hold nothing else.
+
+AAAA is not optional padding: the distribution has IPv6 on, and an IPv6-only client with no AAAA
+record simply cannot reach the site.
 
 A **domain** identity, not an address one, for two reasons: verifying the domain authorises every
 address on it, so `noreply@` needs no click-through of its own; and AWS only grants production
@@ -320,18 +329,22 @@ access on a verified domain.
 
 ### www redirects to the apex, and why that is a correctness fix
 
-`infra/functions/redirect-to-apex.js` is a CloudFront Function on the viewer request. Cookies are
-scoped **per host**, so if both names served the app, signing in on `www` and later opening the
-apex would look like being randomly signed out — and because study data is keyed by account, like
-the data had vanished.
+A rule in `infra/amplify.tf` (`https://www.certucation.click` → `https://certucation.click`,
+301). Cookies are scoped **per host**, so if both names served the app, signing in on `www` and
+later opening the apex would look like being randomly signed out — and because study data is keyed
+by account, like the data had vanished.
 
-Two details in that function are load-bearing:
+Details that are load-bearing:
 
-- It rebuilds the query string. Verification and reset links carry `?token=…`, and dropping it
-  turns a working link into an invalid-token page with nothing to debug from.
-- It is attached to the **default behaviour only, never `/api/*`**. A 301 makes the browser
-  reissue the request, and a reissued POST drops its body — so redirecting the API would break
-  every sign-in and quiz submission sent to `www`, presenting as the API losing data.
+- **The source is a bare host.** Amplify stores a `https://www.certucation.click/<*>` rule but never
+  matches it; the bare host is what it treats as a whole-domain redirect.
+- **It keeps the path and the query string** (checked). Verification and reset links carry
+  `?token=…`, and dropping it would turn a working link into an invalid-token page with nothing
+  to debug from. Email links use `APP_BASE_URL`, the apex, so they never need the redirect anyway.
+- It covers `www/api/*` too. A 301 makes the browser reissue the request, and a reissued POST
+  drops its body — harmless here only because the app on `www` is redirected before it runs, so
+  its API calls always come from the apex.
+- **Rule changes take effect on Amplify's next deployment**, not on apply.
 
 ### Sequencing: why the first apply is narrowed with `-target`
 
@@ -372,14 +385,17 @@ debugging.
 
 ### Changing the domain
 
-`var.domain_name` is the single source. `www.`, `mail.`, the certificate SANs and the `site_url`
-output all derive from it. Two things do not move automatically:
+`var.domain_name` is the single source. `www.`, `mail.`, the certificate SANs, the Amplify domain
+association and `local.site_url` (so CORS, email links and `VITE_API_URL`) all derive from it. Two
+things do not move automatically:
 
 - **`var.mail_from`** is a full address, so it needs editing too. Never point it at a domain SES
   has not verified — sending then fails for every recipient, including the one verified address.
-- **The ACM certificate must be in us-east-1**, because CloudFront reads certificates only from
-  there. `var.region` is already us-east-1, so `dns.tf` needs no aliased provider; changing
-  `var.region` would require one.
+- **The ACM certificate must be in us-east-1**, because Amplify's CloudFront reads certificates
+  only from there. `var.region` is already us-east-1, so `dns.tf` needs no aliased provider;
+  changing `var.region` would require one.
+
+Changing the domain also changes `VITE_API_URL`, which only takes effect on Amplify's next build.
 
 ### Still in the SES sandbox
 
@@ -394,25 +410,31 @@ cannot fail the registration that triggered it.
 
 Live at **https://certucation.click** — see the section above for the domain, DNS and mail.
 
-Front end to S3 + CloudFront. API as Docker → ECR → App Runner. RDS `t4g.micro` on the
-12-month free tier. Secrets in SSM Parameter Store. Terraform in `infra/`. CloudWatch logs plus
-a couple of alarms.
+**Front end on Amplify, which builds and ships it on every push to `main`** — after its build runs
+the lint baseline and the objective check, so a failing commit never replaces the live site. API
+as Docker → ECR → App Runner, shipped by `./scripts/deploy.sh`. RDS `t4g.micro` on the 12-month
+free tier. Secrets in SSM Parameter Store. Terraform in `infra/`. CloudWatch logs; no alarms yet.
+
+**When a change touches both the front end and the API, run `deploy.sh` before merging to
+`main`**, or Amplify ships a front end that calls endpoints the running API does not have yet.
 
 Terraform state is in a private, encrypted, versioned S3 bucket that `scripts/deploy.sh` creates,
 so any machine with AWS credentials can deploy. `deploy.sh` runs Terraform through Docker when it
-isn't installed. Details in [infra/README.md](../infra/README.md).
+isn't installed. Details — including how the Amplify app was created and imported — in
+[infra/README.md](../infra/README.md).
 
-**One CloudFront distribution, two origins** — default to S3, `/api/*` to App Runner. Not a
-preference: the refresh cookie is `SameSite=Strict`, so an API on a separate domain would never
-receive it and every session would die after 15 minutes. Local dev cannot reveal this because
-`localhost:5173` and `localhost:8080` are the same site.
+**One host for the site and the API.** Amplify serves the pages and proxies `/api/*` to App Runner
+with a 200 rewrite. Not a preference: the refresh cookie is `SameSite=Strict`, so an API on a
+separate domain would never receive it and every session would die after 15 minutes. Local dev
+cannot reveal this because `localhost:5173` and `localhost:8080` are the same site. The `www` and
+amplifyapp.com redirects exist to keep it a *single* host.
 
-Moving to a custom domain did not change that, and must not. The app and the API share the single
-host `certucation.click`; the `www` redirect exists to keep it a *single* host rather than two.
+The proxy must forward cookies — the app's cache config is `AMPLIFY_MANAGED`, "keep cookies in
+cache key" — and API responses must never be cached, which rests on Spring Security's `no-store`
+header on every response. Sign in and reload the page: still signed in means both hold.
 
-The `/api/*` behaviour must disable caching and forward all headers, cookies and query strings.
-CloudFront strips `Authorization` and `Cookie` by default, and a cached `/auth/me` would serve
-one account's details to another.
+(Until 2026-09-27 the front end was S3 + one CloudFront distribution with an `/api/*` behaviour.
+It moved so that a push to `main` goes live without a script; see [decisions.md](decisions.md).)
 
 No DynamoDB yet — nothing reads `app.dynamodb.endpoint` and there is no AWS SDK on the
 classpath. It arrives with Phase 4.

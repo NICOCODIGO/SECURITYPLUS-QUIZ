@@ -123,16 +123,6 @@ resource "aws_apprunner_service" "api" {
           AUTH_TRUST_FORWARDED_FOR = "true"
           AUTH_FORWARDED_FOR_HOPS  = "2"
 
-          # TEMPORARY, while the move to Amplify settles the proxy chain: logs
-          # each X-Forwarded-For and the entry chosen (AuthController.clientIp),
-          # so the hops value above can be read off rather than guessed. Logs
-          # IP addresses - remove once the value is confirmed.
-          #
-          # Package level, not the class: Boot lowercases logging env vars, so
-          # ..._AUTHCONTROLLER names a logger `authcontroller` that matches
-          # nothing. That clientIp line is the package's only debug output.
-          LOGGING_LEVEL_COM_SECPLUS_AUTH = "DEBUG"
-
           AUTH_COOKIE_SECURE = "true"
           # Holds only because /api/* is served from the site's own domain.
           AUTH_COOKIE_SAME_SITE = "Strict"
@@ -140,10 +130,10 @@ resource "aws_apprunner_service" "api" {
           # Same-origin to the browser, but not to Spring: behind a proxy the
           # Host it sees is App Runner's while Origin is the site's, so every
           # write is checked as CORS and an origin missing here is refused.
-          # That is why a site being tested on another address (Amplify's
-          # amplifyapp.com, before the domain moves) needs extra_cors_origins.
-          # Variables rather than references — see variables.tf for the cycle.
-          CORS_ALLOWED_ORIGINS = join(",", compact([var.site_url, var.extra_cors_origins]))
+          # That is why a site tested on another address (as Amplify's
+          # amplifyapp.com was, before the domain moved) needs
+          # extra_cors_origins - a variable, see variables.tf for why.
+          CORS_ALLOWED_ORIGINS = join(",", compact([local.site_url, var.extra_cors_origins]))
 
           # SES SMTP in the same region. Port 587 with STARTTLS rather than 465
           # implicit TLS, because that is what JavaMailSender defaults to.
@@ -152,7 +142,7 @@ resource "aws_apprunner_service" "api" {
           MAIL_FROM = var.mail_from
           # Links in verification and reset emails have to point at the site,
           # not at App Runner directly.
-          APP_BASE_URL = var.site_url
+          APP_BASE_URL = local.site_url
         }
 
         runtime_environment_secrets = {

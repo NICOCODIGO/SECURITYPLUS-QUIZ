@@ -54,6 +54,9 @@ cd server
 ./scripts/doctor.sh # is this machine ready? run after switching machines
 ```
 
+**Shipping:** a push to `main` deploys the front end (Amplify builds it). The API and
+infrastructure ship with `./scripts/deploy.sh` — run it *before* merging a change that needs both.
+
 ## Rules that hold everywhere
 
 Short list, kept here because missing one is expensive. Everything else is in `docs/`.

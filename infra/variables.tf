@@ -46,25 +46,6 @@ variable "api_memory" {
   default     = "0.5 GB"
 }
 
-variable "site_url" {
-  description = <<-EOT
-    The public origin, e.g. https://d111111abcdef8.cloudfront.net.
-
-    This exists to break a dependency cycle, not because it is good. CloudFront
-    needs App Runner as an origin, and App Runner wants the CloudFront domain
-    for CORS_ALLOWED_ORIGINS — each needs the other's output. So the first
-    apply runs with the placeholder, and scripts/deploy.sh applies a second time
-    with the real domain once the distribution exists.
-
-    Functionally this value is inert in the normal topology: /api/* is served
-    from the site's own domain, so the browser never issues a cross-origin
-    request and Spring never consults the CORS configuration. It has to be a
-    parseable origin, not a correct one.
-  EOT
-  type        = string
-  default     = "https://placeholder.invalid"
-}
-
 variable "mail_from" {
   description = <<-EOT
     The sender address. Verifying the DOMAIN authorises every address on it, so
@@ -92,13 +73,6 @@ variable "github_repository" {
   default     = "https://github.com/NICOCODIGO/SECURITYPLUS-QUIZ"
 }
 
-variable "github_access_token" {
-  description = "Needed once, when the Amplify app is first created, to connect it to GitHub. Pass as TF_VAR_github_access_token; never commit it. Ignored after creation."
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
 variable "amplify_default_host" {
   description = "The main branch's amplifyapp.com address, which every Amplify app has and cannot remove; it is redirected to the domain. A variable because the app cannot reference its own default_domain in its rules. Changes only if the app is recreated."
   type        = string
@@ -106,7 +80,7 @@ variable "amplify_default_host" {
 }
 
 variable "extra_cors_origins" {
-  description = "Comma-separated origins allowed alongside site_url, e.g. the amplifyapp.com address while it is being tested. A variable rather than a reference to the Amplify app, because the app already references App Runner and that would be a cycle."
+  description = "Comma-separated origins allowed alongside the site, e.g. a test address during a future move. Pass as TF_VAR_extra_cors_origins. A variable rather than a reference to the Amplify app, because the app already references App Runner and that would be a cycle."
   type        = string
   default     = ""
 }

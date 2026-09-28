@@ -1,15 +1,19 @@
 # infra
 
 Terraform for the deployed stack. Applied with `./scripts/deploy.sh` from the repo root, which
-also builds and uploads both halves of the app — don't run `terraform apply` on its own unless
-you only mean to change infrastructure.
+also builds and ships the API and asks Amplify for a build. The front end itself ships by
+**pushing to `main`**: Amplify builds it.
+
+A bare `terraform -chdir=infra apply` is safe (no `-var` needed), but Amplify only picks up rule
+and environment changes on its next deployment — see the comment in `amplify.tf`.
 
 ## What it creates
 
 ```
-certucation.click ── CloudFront ──┬── /*      → S3 (the React app)
-    (www → apex)                  └── /api/*  → App Runner (Spring Boot)
+certucation.click ── Amplify ──┬── /*      → the React app (built from main)
+    (www → apex)               └── /api/*  → 200 rewrite (a proxy) → App Runner (Spring Boot)
                                                     ├── VPC connector ── RDS Postgres 17
+                                                    │                └── SES SMTP endpoint
                                                     └── SSM (secrets)
 
 Route 53 ── ACM certificate (us-east-1) + SES domain identity, DKIM, custom MAIL FROM
@@ -17,15 +21,13 @@ Route 53 ── ACM certificate (us-east-1) + SES domain identity, DKIM, custom 
 
 | File | Holds |
 |---|---|
-| `main.tf` | Providers, the S3 state backend, shared locals |
+| `main.tf` | Providers, the S3 state backend, shared locals (including `site_url`) |
 | `network.tf` | VPC, subnets, the App Runner VPC connector, the SES SMTP endpoint |
 | `database.tf` | RDS Postgres, its generated password, the SSM parameters |
 | `api.tf` | ECR, the two App Runner IAM roles, the service itself |
-| `web.tf` | S3, the distribution, the `www` → apex function |
-| `dns.tf` | The hosted zone lookup, every DNS record, the certificate, the SES identity |
+| `amplify.tf` | The Amplify app, branch, rewrite rules, security headers, domain and its DNS records |
+| `dns.tf` | The hosted zone lookup, the certificate, the SES identity and mail records |
 | `mail.tf` | The SES SMTP user and its derived password |
-| `amplify.tf` | The front end on Amplify: builds on every push to `main`. Being moved to; see below |
-| `functions/` | CloudFront Function source, rendered with `templatefile` |
 
 Standing up a **new** domain is the one case where `terraform apply -target=...` is correct, and
 [docs/devops.md](../docs/devops.md) has the exact command. Everything in `dns.tf` that waits polls
@@ -33,46 +35,54 @@ public DNS, so certificate validation cannot pass until the registry has delegat
 
 ## Amplify
 
-The front end is moving from S3 + CloudFront (`web.tf`) to Amplify, so a push to `main` goes live
-without running a script. The API does not move: it stays on App Runner and still ships with
-`deploy.sh`. **When a change touches both, run `deploy.sh` before merging**, or Amplify ships a
-front end that calls endpoints the running API does not have yet.
+The front end is on Amplify: **a push to `main` goes live**, after Amplify's build runs the lint
+baseline and objective check. The API stays on App Runner and ships with `deploy.sh`. **When a
+change touches both, run `deploy.sh` before merging**, or Amplify ships a front end that calls
+endpoints the running API does not have yet.
 
-Amplify currently runs **alongside** the live site, on its own `amplify_branch_url`, and serves
-nothing on `certucation.click` until the domain is moved. `/api/*` reaches App Runner through a
-200 rewrite in `amplify.tf`, which is a proxy, so the one-domain rule below still holds.
+Four things about it that are not obvious, and each was learned the hard way:
 
-**First-time setup**, once per AWS account:
+- **Rule and environment changes take effect on the next deployment**, not on apply. `deploy.sh`
+  starts one; after a bare `terraform apply`, run
+  `aws amplify start-job --app-id <amplify_app_id> --branch-name main --job-type RELEASE`.
+- **Host redirects take a bare host.** `https://www.example.com` → `https://example.com` works and
+  keeps the path and query; a `https://www.example.com/<*>` source is stored but never matches.
+- **Custom headers must be nested under `applications[].appRoot`** in a monorepo app, or every
+  build fails at the deploy step. And they are written with `jsonencode`, because Amplify stores
+  them as JSON and YAML shows as a change on every plan.
+- **Amplify writes DNS records itself** when the Route 53 zone is in the same account, and gives
+  `www` a CNAME. The records in `amplify.tf` use `allow_overwrite` to adopt them.
 
-1. In GitHub, install the **AWS Amplify** GitHub App on this repository.
-2. Create a GitHub personal access token for it, following AWS's guide *"Setting up the Amplify
-   GitHub App for AWS CloudFormation, CLI, and SDK deployments"*. Amplify uses it once, to
-   connect; Terraform ignores it afterwards.
-3. `export TF_VAR_github_access_token=<token>` and run `./scripts/deploy.sh`. Without the token
-   it stops before shipping anything.
-4. `main` is what gets built, so merge to it first.
+**Recreating the app.** It was made in the Amplify console (GitHub → this repo → `main`, "my app
+is a monorepo" with root `secapp`, name `secplus`) and then imported, because Terraform can only
+create one with a GitHub token. To do that again: create it the same way, then
+`terraform -chdir=infra import aws_amplify_app.web <app-id>` and
+`terraform -chdir=infra import aws_amplify_branch.main <app-id>/main`, update
+`amplify_default_host` in `variables.tf`, and apply. `deploy.sh` refuses to run until the import
+is done, rather than creating a second app.
 
-To test on the Amplify address, it has to be an allowed origin: rerun with
-`TF_VAR_extra_cors_origins=<amplify_branch_url>`. Spring sees App Runner's host but the site's
-`Origin`, so it treats every write as CORS (see the comment in `api.tf`).
+To test a new front door on another address before moving the domain, that address has to be an
+allowed origin: apply with `TF_VAR_extra_cors_origins=<address>`. Spring sees App Runner's host but
+the site's `Origin`, so it treats every write as CORS (see the comment in `api.tf`).
 
 ## The three things that will bite you
 
 **One domain, not two.** The refresh token is a `SameSite=Strict` cookie. Serve the API from its
 own domain and browsers will never send it — refresh fails forever and every user is signed out
 15 minutes after signing in. Local development cannot reveal this, because `localhost:5173` and
-`localhost:8080` are the same site. That is why `/api/*` is a CloudFront behaviour rather than a
-separate distribution.
+`localhost:8080` are the same site. That is why `/api/*` is a **200 rewrite** in `amplify.tf` — a
+proxy, so the browser only ever talks to the site's own domain — and never a redirect to App
+Runner's address.
 
-The custom domain kept that property rather than breaking it. `www` is aliased on the distribution
-only so a CloudFront Function can 301 it to the apex — cookies are scoped per host, so two
-serving hostnames would mean signing in on one and appearing signed out on the other.
+`www` is attached only so a rule can 301 it to the apex — cookies are scoped per host, so two
+serving hostnames would mean signing in on one and appearing signed out on the other. The
+`amplifyapp.com` address every Amplify app has is redirected the same way.
 
-**The `/api/*` behaviour's policies are load-bearing.** It uses `Managed-CachingDisabled` and
-`Managed-AllViewerExceptHostHeader`. Defaults would strip `Authorization` and `Cookie` (so every
-authenticated request looks anonymous) and cache responses (so one account's data could be
-served to another). `AllViewerExceptHostHeader` specifically, not `AllViewer` — App Runner
-rejects a forwarded viewer `Host`.
+**The `/api/*` proxy's two settings are load-bearing.** The app's cache config is
+`AMPLIFY_MANAGED` ("Keep cookies in cache key" in the console): without it the refresh cookie may
+never reach App Runner, and every session ends at the 15-minute mark. And nothing on Amplify stops
+an API response being cached — that is Spring Security's `no-store` on every response, so never
+turn it off. Both are checked by signing in and reloading: still signed in means both work.
 
 **`AUTH_JWT_SECRET` must survive deploys.** It is generated once and held in SSM with
 `ignore_changes` on its value. Rotating it signs every user out. `application-prod.properties`
@@ -81,9 +91,10 @@ minting a throwaway key.
 
 ## Cost
 
-RDS `db.t4g.micro` is free-tier eligible for 12 months on a new account. S3, CloudFront and ECR
-are pennies at portfolio traffic. **App Runner is the real cost** — it bills for provisioned
-memory even while idle, so this is not a scale-to-zero stack.
+RDS `db.t4g.micro` is free-tier eligible for 12 months on a new account. Amplify hosting (about
+$0.01 per build minute, a build takes about 3) and ECR are pennies at portfolio traffic. **App
+Runner is the real cost** — it bills for provisioned memory even while idle, so this is not a
+scale-to-zero stack.
 
 There is deliberately **no NAT gateway** (~$32/month, usually the largest avoidable line item).
 A VPC connector sends all of App Runner's outbound traffic into the VPC, so without a NAT the app

@@ -25,7 +25,7 @@ Resumable exam sessions are phase 4. See [decisions.md](decisions.md).
 | Relational | PostgreSQL 17 + Flyway | System of record |
 | Key-value | DynamoDB | In-progress exam sessions only |
 | Auth | Own bcrypt + JWT, rotating refresh | Not Cognito |
-| Deploy | S3 + CloudFront, ECR → App Runner, RDS, Terraform | Live; see `infra/` |
+| Deploy | Amplify (front end, on push to `main`), ECR → App Runner, RDS, Terraform | Live; see `infra/` |
 | CI | GitHub Actions | `.github/workflows/ci.yml` |
 
 The AWS stack the original README planned — Lambda, API Gateway, Cognito, Amplify, MySQL —
@@ -106,11 +106,12 @@ Each phase ends with the app fully working, deployed or not.
   blueprint-weighted draw, submit + review payload.
 - **5 — ~~Leaderboard~~. Cut.** See [decisions.md](decisions.md).
 - **6 — Deploy.** ✅ Done. **Live at https://certucation.click.** Terraform in
-  `infra/`, shipped by `./scripts/deploy.sh`; S3 + CloudFront, ECR → App Runner, RDS
-  `t4g.micro` in a private subnet, secrets in SSM, state in S3. One distribution serves both
-  the site and `/api/*` — required, not tidy: the `SameSite=Strict` refresh cookie is never
-  sent to a different domain. No NAT gateway (no outbound calls) and no DynamoDB (unused until
-  phase 4). Request-id correlation on every log line; JSON logs in `prod`.
+  `infra/`. The front end is on Amplify and ships on every push to `main`; the API is ECR → App
+  Runner, shipped by `./scripts/deploy.sh`. RDS `t4g.micro` in a private subnet, secrets in SSM,
+  state in S3. One domain serves both the site and `/api/*` (Amplify proxies it) — required, not
+  tidy: the `SameSite=Strict` refresh cookie is never sent to a different domain. No NAT gateway
+  (SES is reached through a private endpoint) and no DynamoDB (unused until phase 4). Request-id
+  correlation on every log line; JSON logs in `prod`.
 - **7 — Content.** Admin authoring behind the `role` column, question drafts/review, then
   performance-based questions (drag-and-drop, hotspot).
 

@@ -41,13 +41,19 @@ provider "aws" {
 
 locals {
   name = var.project
+
+  # The public origin. Derived, not a variable: it used to be passed in to break
+  # a CloudFront <-> App Runner cycle, and a forgotten `-var` then silently put
+  # a placeholder into CORS and every email link.
+  site_url = "https://${var.domain_name}"
 }
 
-# The SPA and the API are served from ONE CloudFront domain. This is not a
-# preference: the refresh token is a SameSite=Strict cookie, so an API on a
-# different domain would never receive it and every session would die after 15
-# minutes. Local dev cannot reveal that, because localhost:5173 and
-# localhost:8080 are the same site. See docs/decisions.md before splitting them.
+# The SPA and the API are served from ONE domain - Amplify serves the pages and
+# proxies /api/* to App Runner (amplify.tf). This is not a preference: the
+# refresh token is a SameSite=Strict cookie, so an API on a different domain
+# would never receive it and every session would die after 15 minutes. Local
+# dev cannot reveal that, because localhost:5173 and localhost:8080 are the same
+# site. See docs/decisions.md before splitting them.
 
 data "aws_availability_zones" "available" {
   state = "available"

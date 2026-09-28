@@ -68,7 +68,7 @@ Still on the page and needing care:
 |---|---|
 | AWS Lambda + API Gateway | Docker → ECR → App Runner |
 | AWS Cognito | Own bcrypt + JWT with rotating refresh tokens |
-| AWS Amplify | S3 + CloudFront |
+| S3 + CloudFront for the front end (the original plan's Amplify was dropped for it; it ran until 2026-09-27) | **AWS Amplify after all.** A push to `main` deploys, with no script to forget — S3 + CloudFront shipped whatever was on the deploying machine's disk, which put a half-finished page live. One host is kept by a 200 rewrite that proxies `/api/*` to App Runner |
 | MySQL | PostgreSQL |
 | A JWT library (jjwt, Nimbus direct) | `spring-boot-starter-security-oauth2-resource-server` — the Boot BOM manages it, so no version to pin and no hand-written filter |
 | Bucket4j for rate limiting | A ~60-line in-memory map. One App Runner instance with no shared cache means a library buys the same per-instance guarantee plus a dependency; at the point it scales past one instance the question is Redis-or-not |
@@ -117,10 +117,10 @@ Not bugs. Known, chosen, and waiting.
 | **Moving the 147 misfiled questions** | Changes what each domain quiz asks | Do it with the Phase 1 import, not piecemeal |
 | **Blueprint-weighted mock draw** | Needs the server-side draw | Phase 4 |
 | **The lesson-reading flow** | Orphaned: wrong route, wrong param reader, unreachable writer | A known gap, not something to work around |
-| **A production image for `secapp/`** | Phase 6 serves `dist/` from S3 + CloudFront | May never be needed |
+| **A production image for `secapp/`** | Amplify builds and serves `dist/` | Not needed |
 | **Front-end test framework** | None configured | Considered after Phase 1 |
 | **Fixing the 6 lint problems** | Baseline-tracked instead, so they can't grow | `npm run lint:check` |
-| **`SameSite=None` for the refresh cookie** | Fix it by construction instead: an `/api/*` behaviour on the same CloudFront distribution makes the cookie first-party and removes CORS. `None` makes it third-party, the category browsers are removing | Phase 6 |
+| **`SameSite=None` for the refresh cookie** | Fixed by construction instead: `/api/*` is proxied on the site's own domain (Amplify's 200 rewrite), which makes the cookie first-party. `None` makes it third-party, the category browsers are removing | Done |
 
 ## Naming oddities that are not mistakes
 

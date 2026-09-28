@@ -13,10 +13,9 @@
 
 # ------------------------------------------------------- security headers --
 
-# One definition, served by whichever front door is live: Amplify below, and
-# the CloudFront distribution in web.tf until the domain moves. Without them the
-# login and 2FA pages can be framed by another site (clickjacking) and nothing
-# limits where scripts may come from.
+# Sent on every page (custom_headers, below). Without them the login and 2FA
+# pages can be framed by another site (clickjacking) and nothing limits where
+# scripts may come from.
 #
 # The CSP was checked against the production build in a real browser: no page
 # needs an inline script, styles need 'unsafe-inline' (component libraries set
@@ -53,11 +52,9 @@ resource "aws_amplify_app" "web" {
   repository = var.github_repository
   platform   = "WEB"
 
-  # Used once, to connect Amplify to the repository; after that Amplify goes
-  # through its GitHub App. Ignored afterwards, so later applies neither need
-  # the token nor try to "change" it to empty. null, not "", when unset: the
-  # provider rejects an empty string even in a plan.
-  access_token = var.github_access_token != "" ? var.github_access_token : null
+  # No access token: the app was created in the console, where Amplify's GitHub
+  # App was authorised, and then imported. Recreating it from scratch would
+  # need one (`access_token`, used once) - or the same console-then-import.
 
   # A monorepo: the app is secapp/, and Amplify needs both the appRoot below
   # and this variable, set to the same path, to find it.
@@ -168,10 +165,6 @@ resource "aws_amplify_app" "web" {
     source = "</^[^.]+$|\\.(?!(css|gif|ico|jpg|jpeg|js|png|txt|svg|woff|woff2|ttf|map|json|webp|webmanifest)$)([^.]+$)/>"
     target = "/index.html"
     status = "200"
-  }
-
-  lifecycle {
-    ignore_changes = [access_token]
   }
 }
 
