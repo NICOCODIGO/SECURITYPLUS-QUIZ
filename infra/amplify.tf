@@ -121,6 +121,12 @@ resource "aws_amplify_app" "web" {
   })
 
   # Order matters: the first rule that matches wins.
+  #
+  # Rule changes take effect only with the NEXT DEPLOYMENT, not when applied:
+  # an apply alone leaves the old rules serving (checked - the new redirects
+  # stayed 200 until a build ran). scripts/deploy.sh starts a RELEASE for this;
+  # after a bare `terraform apply`, run
+  #   aws amplify start-job --app-id <amplify_app_id> --branch-name main --job-type RELEASE
 
   # The amplifyapp.com address every Amplify app has cannot be removed, so it
   # sends people to the real one. First, so it wins over the /api proxy too:
