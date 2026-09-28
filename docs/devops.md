@@ -19,7 +19,7 @@ Don't copy `node_modules` between machines: some packages ship OS-specific binar
 state is in S3 (see [infra/README.md](../infra/README.md)), so there is no state file to carry over.
 
 Everything else git ignores rebuilds itself: `node_modules` (doctor.sh), Gradle's caches and
-`server/build/` (the first `./gradlew` run), `infra/.terraform/` (`deploy.sh` runs `init`).
+`server/build/` (the first `./gradlew` run), `infra/.terraform` (`deploy.sh` runs `init`).
 
 **On a Mac:** the same tools, from Homebrew or their installers; the scripts run in the normal
 Terminal. On Apple Silicon, `deploy.sh` builds the API image for `linux/amd64` on purpose —

@@ -1,4 +1,5 @@
-// Every repo path named in CLAUDE.md, docs/*.md and .claude/agents/*.md must exist.
+// Every repo path named in the README, CLAUDE.md, docs/*.md, docs/guide/*.md and
+// .claude/agents/*.md must exist.
 //
 //   node scripts/check-doc-links.mjs
 //
@@ -14,31 +15,55 @@
 // trailing slash, so prose like `npm run build` and `grid-cols-1` is not mistaken for a
 // path.
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { globSync } from 'node:fs';
-import { resolve, dirname, join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { resolve, dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
+// What a fresh clone has: tracked files plus new ones not yet committed, minus anything
+// gitignored. Checked against THIS rather than the disk, because an ignored path that happens
+// to exist locally (infra/.terraform/, .vscode/) passes on the disk and then fails in CI,
+// where it doesn't exist. Asking git makes this machine and CI give the same answer.
+const inRepo = new Set();
+for (const file of execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
+  cwd: root,
+  encoding: 'utf8',
+}).split('\n')) {
+  if (!file) continue;
+  const parts = file.split('/');
+  for (let i = 1; i <= parts.length; i++) inRepo.add(parts.slice(0, i).join('/'));
+}
+
+const existsInRepo = (absolute) => {
+  const path = relative(root, absolute).split(sep).join('/').replace(/\/$/, '');
+  return path === '' || inRepo.has(path);
+};
+
 const FILE_EXT = /\.(js|jsx|mjs|cjs|json|md|sql|java|css|html|sh|yml|yaml|gradle|properties|bat|png|svg)$/;
 
-// Skipped: URLs, anchors, the `@/` import alias, and build output a fresh clone lacks.
+// Skipped: URLs, anchors, the `@/` import alias, the site's home route (a bare `/` in a
+// routes table), and build output a fresh clone lacks.
 const IGNORE = [
-  /^https?:/, /^#/, /^mailto:/, /^@/,
+  /^https?:/, /^#/, /^mailto:/, /^@/, /^\/$/,
   /node_modules/, /^server\/build/, /^server\/\.gradle/, /(^|\/)dist\/?$/,
 ];
 
 // Referenced on purpose, does not exist yet. Each is something a roadmap phase creates;
 // remove the entry when the file lands so the checker starts guarding it for real.
-const PLANNED = new Set([
-  'infra/',                                   // phase 6, Terraform
-  'secapp/src/components/data/source.js',     // phase 3, the Local/RemoteSource seam
-]);
+// (Empty today: phase 3's source.js and phase 6's infra/ both landed.)
+const PLANNED = new Set([]);
 
+// Local-only paths - gitignored, so a fresh clone and CI lack them - fail the check even
+// when they exist on this disk. Write them without a trailing slash (`server/bin`,
+// `infra/.terraform`), which this checker skips as prose, or add a pattern to IGNORE.
 const files = [
+  'README.md',
   'CLAUDE.md',
   ...globSync('docs/*.md', { cwd: root }),
+  ...globSync('docs/guide/*.md', { cwd: root }),
   ...globSync('.claude/agents/*.md', { cwd: root }),
 ];
 
@@ -78,7 +103,7 @@ for (const file of files) {
       resolve(root, 'secapp/src', ref),
     ];
 
-    if (!candidates.some((path) => existsSync(path))) missing.push({ file, ref });
+    if (!candidates.some(existsInRepo)) missing.push({ file, ref });
   }
 }
 
