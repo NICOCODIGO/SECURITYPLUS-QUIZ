@@ -17,6 +17,10 @@ Registered in `secapp/src/App.jsx`:
 | `/resources` | `AdminContentManager.jsx` | **Misnamed** — it is a Study Resources page, not an admin panel |
 | `/daily` | `DailyQuestion.jsx` | Full-screen |
 | `/quiz` and `/TakeQuiz` | `TakeQuiz.jsx` | Full-screen; both paths on purpose |
+| `/login`, `/signup` | `Login.jsx`, `SignUp.jsx` | Inside `Layout`, not full-screen, so there is always a way back. Both honour `?next=` through `safeNext.js` |
+| `/forgot-password`, `/reset-password` | `ForgotPassword.jsx`, `ResetPassword.jsx` | Public — reached by someone who cannot sign in |
+| `/verify-email` | `VerifyEmail.jsx` | Where the emailed link lands. The page spends the token with a POST, so a mail scanner prefetching the link cannot |
+| `/account` | `Account.jsx` | Email verification, password, 2FA and recovery codes. Signed out, it shows a sign-in link |
 
 `/quiz` and `/TakeQuiz` both exist because `createPageUrl('TakeQuiz')` generates the
 capitalized form. Route matching is case-insensitive (React Router default), so `/Lessons`
@@ -125,9 +129,10 @@ rather than calling `localStorage` directly.**
 | `quiz_history:<user id>` | `quizHistoryData.js` | Every finished attempt. The main one. |
 | `daily_question:<user id>` | `dailyQuestion.js` | Question-of-the-Day answers and streak |
 | `flagged_questions:<user id>` | `questionPools.js` | Questions flagged during a quiz |
+| `pending_attempts:<user id>` | `source.js` | Attempts that failed to upload, retried on the next sync |
 | `security_plus_progress` | `progressData.js` | Lesson completion — **never written**, see below |
 
-The first three are **namespaced by account**, via `scopedKey()` in `persistence.js`. Two
+The first four are **namespaced by account**, via `scopedKey()` in `persistence.js`. Two
 people share a browser more often than "local storage" suggests — a family laptop, a library
 machine — and without the namespace the second person to sign in reads the first one's history
 as their own and appends to it. `security_plus_progress` is not namespaced because nothing
@@ -136,7 +141,7 @@ writes it.
 ### Persistence requires an account
 
 `secapp/src/components/data/persistence.js` exports **one** predicate,
-`isPersistenceAllowed()`, and the first three accessors above consult it before every read and
+`isPersistenceAllowed()`, and the namespaced accessors above consult it before every read and
 every write. It is true only while an account is signed in.
 
 Signed out, a quiz is taken, scored and reviewed exactly as normal — the score lives in
@@ -268,9 +273,35 @@ queued under its own namespaced key and flushed on the next hydrate, *before* th
 quiz taken offline is never lost. The server dedupes on the attempt's client-minted id, so
 re-sending one that did land after all is a no-op rather than a duplicate.
 
-**Fallback is a hard requirement.** If `VITE_API_URL` is unset or a request fails, everything
-falls back to browser storage and the bundled question bank. `npm run dev` on a clean checkout
-must give a fully working app with no Docker, no database and no account.
+**Fallback is a hard requirement.** If `VITE_API_URL` is unset or the API is unreachable, the
+question bank falls back to the bundled copy, and every domain quiz and the mock exam still
+run. `npm run dev` on a clean checkout must give a working app with no Docker, no database and
+no account. With the API unset there are no accounts, so nothing is recorded (see
+[Persistence requires an account](#persistence-requires-an-account)); signed in with the API
+briefly unreachable, writes stay local and are uploaded on the next sync.
+
+## Signing in
+
+`secapp/src/auth/AuthProvider.jsx` holds who is signed in. Its `status` is `loading`,
+`authenticated`, `anonymous`, or `unavailable` (no `VITE_API_URL`; no request is ever made).
+Components read it through `useAuth()`.
+
+- **The access token lives in memory only** (`secapp/src/api/authSession.js`), never in
+  browser storage: it carries full account authority for 15 minutes, and storage is readable
+  by any script on the page. The refresh token is an httpOnly cookie that script cannot read.
+- **The refresh on page load is required — do not remove it.** The quiz flow crosses full
+  page reloads, which wipe the in-memory token. On mount, `AuthProvider` calls
+  `/auth/refresh`; the cookie survives the reload and a new access token is issued. Without
+  it, signing in appears to work until someone starts a quiz.
+- **One refresh at a time.** `apiClient.js` retries a request that got a 401 once, after a
+  refresh, and every caller shares the same in-flight refresh. Refresh tokens rotate, and the
+  server treats a second use of a rotated token as theft and revokes every session, so three
+  parallel refreshes would sign the user out.
+- **`X-Secplus-Client` is set inside `apiClient.js`**, on `/auth/refresh` and `/auth/logout`
+  only. It is the API's CSRF defence; see [backend.md](backend.md).
+- **`?next=` is only followed through `safeNext.js`**, which keeps a value only if it resolves
+  to this site (see [the Practice page](#lessons-is-the-practice-page) above).
+- **Study data is synced before the UI shows signed-in** (`source.js`, above).
 
 ## The lesson-reading flow is disconnected
 

@@ -1,8 +1,8 @@
 # Question bank & content
 
 The 444 questions, their objectives, their wrong-answer rationales, and the external sources
-the site cites. Currently all in `secapp/src/components/data/`; Phase 1 moves the bank to
-Postgres ([database.md](database.md)).
+the site cites. All are written in `secapp/src/components/data/`. The API serves a copy of the
+bank from Postgres, generated from those files ([database.md](database.md)).
 
 ## Where the bank lives
 
@@ -101,9 +101,10 @@ the Day.
 > quietly damage the content.
 
 The same fragility hits history: question ids are `hashQuestion(question.question)`, a djb2
-hash of the text, so **editing a question's wording retires its history** for every user. The
-Postgres import fixes this with stable uuids and keeps the hash as `legacy_hash` so existing
-localStorage history still joins.
+hash of the text, so **editing a question's wording retires its history** for every user.
+Postgres does give each question a stable uuid, but it does not fix this yet: the browser and
+sync still identify questions by the hash (`legacy_hash`), and the seed is keyed on it, so an
+edited question arrives as a new row and the old one is retired.
 
 ## Joining questions back to domains
 

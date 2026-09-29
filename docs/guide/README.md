@@ -1,8 +1,9 @@
 # Start here
 
-Plain-English guides to how this project fits together. They are for getting your bearings —
-coming back after a break, setting up a new computer, or wondering what a file is for. When you
-need the exact technical detail, each guide links to the doc in `docs/` that owns it.
+Plain-English guides to how this project fits together. They are useful when returning after a
+break, setting up a new computer, or checking what a file is for. No programming background is
+assumed. When you need the exact technical detail, each guide links to the doc in `docs/` that
+owns it.
 
 Read them in this order the first time:
 
@@ -13,6 +14,11 @@ Read them in this order the first time:
 | [Every file, explained](files.md) | What is `verify.sh`? `gradlew`? `settings.gradle`? `components.json`? Every file and folder, one line each. |
 | [Everyday tasks](everyday-tasks.md) | The commands for running it, checking it, shipping it, switching computers — and what to do when something fails. |
 | [Glossary](glossary.md) | What do API, container, migration, JWT, CORS, App Runner, Terraform… mean? |
+
+Each main folder also has its own README describing what it contains:
+[secapp/](../../secapp/README.md) (the website), [server/](../../server/README.md) (the API),
+[infra/](../../infra/README.md) (the AWS setup) and [scripts/](../../scripts/README.md)
+(helper scripts).
 
 The technical docs, for when you are changing something:
 

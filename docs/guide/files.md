@@ -29,6 +29,7 @@ work together, read [The big picture](big-picture.md) first.
 | `scripts/deploy.sh` | **Ships the API and infrastructure** to AWS: builds the API image, uploads it, applies Terraform, rolls App Runner over, starts an Amplify build. |
 | `scripts/generate-seed.mjs` | Turns the question bank into the SQL file the database loads. Run it after editing questions (`verify.sh` reminds you). |
 | `scripts/check-doc-links.mjs` | Fails if any doc names a file that no longer exists, so docs can't silently rot. |
+| `scripts/README.md` | What each script is for and when to run it. |
 
 ## `secapp/` — the website
 
@@ -83,6 +84,7 @@ work together, read [The big picture](big-picture.md) first.
 | `server/src/main/resources/application-prod.properties` | Settings only the live API uses (JSON logs; refusing to start without the signing key). |
 | `server/src/main/resources/db/migration/` | **Migrations** — numbered SQL files that build the database, one change each, never edited once applied. `R__seed_content.sql` is the question bank. |
 | `server/src/test/java/com/secplus/` | The tests. `./gradlew test` runs them; they need Docker. |
+| `server/README.md` | How to run the API, what each folder holds, and the rules for changing it. |
 
 ## `infra/` — the AWS setup
 
@@ -100,7 +102,7 @@ Terraform files. Each describes some AWS resources; `terraform apply` makes AWS 
 | `infra/dns.tf` | The domain's DNS records, the HTTPS certificate, and email authentication (SES). |
 | `infra/mail.tf` | The login the API uses to send email. |
 | `infra/.terraform.lock.hcl` | Pins the Terraform plugin versions, like `package-lock.json` does. |
-| `infra/README.md` | How to apply it, what it costs, and the lessons learned. |
+| `infra/README.md` | How to apply it, what it costs, and the settings that keep sign-in working. |
 
 ## What git ignores, and how each comes back
 

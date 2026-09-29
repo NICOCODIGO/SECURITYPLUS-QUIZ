@@ -36,7 +36,9 @@ shadcn/ui, plain JSX (not TypeScript), in `secapp/`.
 
 ## Verify by looking, not by assuming
 
-Use the **`browser-automation`** skill. Start the dev server if it isn't running
+Use the **`browser-automation`** skill. It is not installed on every machine; without it,
+drive Playwright directly (`npx playwright` — it is not a project dependency). Start the dev
+server if it isn't running
 (`cd secapp && npm run dev`, port 5173), then load the page you changed and check:
 
 - zero console errors and no failed requests,

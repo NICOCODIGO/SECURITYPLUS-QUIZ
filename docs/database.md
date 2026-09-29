@@ -1,7 +1,9 @@
 # Database
 
-PostgreSQL is the system of record. DynamoDB holds one thing. Schema lives in
-`server/src/main/resources/db/migration/V1__init.sql`.
+PostgreSQL is the system of record. DynamoDB is reserved for one thing, resumable mock exams
+(phase 4), and nothing uses it yet. The schema is built by the migrations in
+`server/src/main/resources/db/migration/`: `V1__init.sql` (the baseline),
+`V2__account_security.sql` (verification, reset, 2FA) and `V3__totp_last_step.sql`.
 
 ## Rules
 
@@ -28,7 +30,7 @@ Three deliberate choices:
   directly. Parsing JS from the JVM would be the wrong tool by a wide margin.
 - **Repeatable (`R__`), not versioned.** Flyway re-applies a repeatable migration whenever
   its checksum changes — exactly right for reference data that keeps being edited. Adding a
-  question means regenerating this one file, not writing `V3`, `V4`, `V5`. Every statement
+  question means regenerating this one file, not writing a new versioned migration. Every statement
   is an upsert keyed on a natural key (`objectives.code`, `questions.legacy_hash`,
   `choices (question_id, position)`), so re-running is safe.
 - **Questions that disappear are retired, never deleted.** `attempt_answers` reference them,
@@ -62,7 +64,9 @@ covered by `questions.explanation` instead.
 ### People
 
 **`users`** — `id` uuid PK, `email`, `password_hash`, `display_name`, `role`
-(`USER`/`ADMIN`), `email_verified`, `two_factor_method`, `totp_secret`, timestamps.
+(`USER`/`ADMIN`), `email_verified`, `two_factor_method`, `totp_secret`, `totp_last_step`,
+timestamps. The first three 2FA columns come from V2; `totp_last_step` from V3 (it makes each
+TOTP code usable once — see [backend.md](backend.md)).
 
 `two_factor_method` is nullable and constrained to `('email','totp')`; **null means 2FA is
 off**. One nullable column rather than a boolean plus a method, so "on, but by which means"
@@ -108,10 +112,11 @@ past 2FA, which makes them password-equivalent.
 `objectives`, so it can never drift from the answers it summarises.
 
 `server_graded` records *how* the score was arrived at, not how much it is trusted — there is
-no ranking here, so nobody gains by lying to their own dashboard. Mock exams run as a
-server-held session and are scored there; practice quizzes are scored in the browser. The two
-can cross: the app must keep working with the API off, so a mock taken offline comes back
-client-scored. The flag is what tells those apart afterwards.
+no ranking here, so nobody gains by lying to their own dashboard. **Today it is always
+false**: every quiz, the mock exam included, is scored in the browser. Phase 4 moves mock exams
+to a server-held session scored there. The two can then cross: the app must keep working with
+the API off, so a mock taken offline comes back client-scored. The flag is what tells those
+apart afterwards.
 
 ### Account state
 
@@ -122,9 +127,10 @@ weighted averages. **The streak is derived from these rows, never stored as a co
 **`flagged_questions`** — PK `(user_id, question_id)`, `created_at`.
 
 **`custom_quiz_presets`** — `id` uuid PK, `user_id`, `name`, `config` jsonb. Unique on
-`(user_id, name)`.
+`(user_id, name)`. **Unused**: the Build Your Own quiz never saves its settings, so nothing
+writes this table and there is no `/me/presets` endpoint.
 
-## Indexes (8)
+## Indexes (10)
 
 | Index | Purpose |
 |---|---|
@@ -136,6 +142,8 @@ weighted averages. **The streak is derived from these rows, never stored as a co
 | `refresh_tokens_user_idx` | partial, `where revoked_at is null` |
 | `attempts_user_time_idx` | `(user_id, submitted_at desc)` — every dashboard query |
 | `attempt_answers_question_idx` | "how often is this question missed" |
+| `user_tokens_user_purpose_idx` | partial, `where used_at is null` — a user's live tokens of one purpose (V2) |
+| `recovery_codes_unused_idx` | partial, `where used_at is null` — recovery codes left (V2) |
 
 ## Two invariants the schema enforces, and one it can't
 
@@ -157,14 +165,18 @@ comparison. **Don't reintroduce domain logic that trusts the filing.** See
 
 ## `legacy_hash`
 
-The existing djb2 `hashQuestion` value from the front end. It exists solely so imported
-localStorage history joins to the right row, since stored attempts reference questions by
-text hash.
+The existing djb2 `hashQuestion` value from the front end. The browser identifies questions
+by this hash in its history, flags and daily answers, so sync uses it to join them to the
+right row (`MeStore` translates hash ↔ uuid in both directions).
 
 **Don't drop it, and don't make it the primary key.** The whole point of the uuid is that
 editing a question's wording no longer retires its history.
 
-## DynamoDB — one table
+## DynamoDB — one table, planned for phase 4
+
+**Not built yet.** `./gradlew bootRun` starts `dynamodb-local` and `application.properties`
+has its settings, but no code reads or writes it, the table is not created, and there is no
+DynamoDB on AWS. The design:
 
 **`exam_sessions`** — PK `session_id`; attributes `user_id`, `question_ids[]`, `answers` map,
 `type`, `created_at`, `expires_at` (**TTL**).
@@ -179,15 +191,17 @@ restart** — see [devops.md](devops.md).
 
 ## Browser key → table map
 
-Phase 3 syncs these. Anonymous users keep using browser storage; an account mirrors it.
+Phase 3 syncs these. Study data is kept only while signed in: the synced keys are namespaced
+by user id (`scopedKey()` in `persistence.js`), and signed out nothing is read or written.
 
 | Browser key (`secapp/src/components/data/`) | Postgres |
 |---|---|
 | `quiz_history` (`quizHistoryData.js`) | `attempts` + `attempt_answers` |
 | `daily_question` (`dailyQuestion.js`) | `daily_answers` |
 | `flagged_questions` (`questionPools.js`) | `flagged_questions` |
-| custom quiz configs (`CustomQuizBuilder`) | `custom_quiz_presets` |
+| `pending_attempts` (`source.js`) | none — attempts that failed to upload, retried on the next sync |
 | `security_plus_progress` (`progressData.js`) | **no table yet** — the writer is unreachable |
 
-`POST /me/import` merges local history by `(legacy_hash, submitted_at)` so a double import
-can't duplicate.
+There is no `POST /me/import`. On sign-in the browser pulls the server's history and uploads
+any attempt the server lacks; dedupe is the client-minted attempt id (`on conflict (id) do
+nothing`). See [decisions.md](decisions.md).

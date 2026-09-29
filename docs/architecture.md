@@ -9,8 +9,8 @@ a 90-question mock exam, a custom quiz builder, Question of the Day, and a progr
 dashboard.
 
 **Live at https://certucation.click.** The front end is complete, the API serves
-the question bank and **has accounts** — register, login, rotating refresh, logout, me — and
-the whole stack is deployed on AWS.
+the question bank and **has accounts** — register, login, rotating refresh, logout, email
+verification, password reset and optional 2FA — and the whole stack is deployed on AWS.
 
 Study data is kept only while signed in, and **follows the account between devices**: signing
 in anywhere pulls your history down and merges it with whatever that browser already had.
@@ -34,10 +34,11 @@ was **abandoned**. So were TypeScript and React Query. See [decisions.md](decisi
 ## Repo map
 
 ```
-secapp/     React front end          → frontend.md, components.md, content.md
-server/     Spring Boot API          → backend.md, database.md
+secapp/     React front end          → frontend.md, components.md, content.md, secapp/README.md
+server/     Spring Boot API          → backend.md, database.md, server/README.md
 docs/       these files
 infra/      Terraform for AWS        → devops.md, infra/README.md
+scripts/    helper scripts           → devops.md, scripts/README.md
 verify.sh   the one verification command
 ```
 
@@ -71,8 +72,8 @@ Three rules that follow from this, and that everything else is built around:
 2. **Nothing comparative.** No leaderboard, ranking, percentiles or cross-user visibility —
    rejected deliberately, and it set the shape of the whole back end.
 3. **Storage is per account.** Keys are namespaced by user id, so two people sharing a browser
-   never see each other's history. Phase 3's `POST /me/import` is a merge the user asks for;
-   silently adopting whatever was already in the browser is not.
+   never see each other's history. Browser data from before accounts existed is never adopted
+   into whichever account signs in first — see [decisions.md](decisions.md).
 
 ## Roadmap
 
@@ -85,24 +86,27 @@ Each phase ends with the app fully working, deployed or not.
     questions, 1,776 choices, 1,332 rationales, seeded and verified against real Postgres.
   - ✅ Server-side integrity tests (`ContentSeedTests`) — a bad tag now fails CI.
   - ✅ Public question endpoints — `/questions`, `/objectives`, `/domains`, with CORS,
-    deny-by-default security and RFC 7807 errors. 29 tests.
+    deny-by-default security and RFC 7807 errors. 29 tests at the time.
   - ✅ Front end hydrates from the API on boot (`questionBank.js`), falling back to the
     bundled bank when `VITE_API_URL` is unset or the API is unreachable.
   - **Phase 1 complete.**
-- **2 — Auth.** ✅ Done, server side. Register/login/refresh/logout/me, BCrypt 12, 15-minute
+- **2 — Auth.** ✅ Done, server and front end. Register/login/refresh/logout/me, BCrypt 12, 15-minute
   access JWT, rotating refresh in an httpOnly `SameSite=Strict` cookie scoped to
   `/api/v1/auth`, reuse detection that revokes the whole token family, in-memory rate
   limiting, and login responses that are byte-identical for a wrong password and an unknown
   email. Register returns 409 on a duplicate — a documented narrowing, see
-  [decisions.md](decisions.md). 52 tests. No new migration: `V1__init.sql` already had
-  `users` and `refresh_tokens`.
+  [decisions.md](decisions.md). 52 tests at the time. No new migration: `V1__init.sql` already
+  had `users` and `refresh_tokens`.
+  - ✅ Account security, added later: email verification, password reset, and optional 2FA
+    (emailed codes or an authenticator app, with recovery codes). Migrations `V2` and `V3`.
+    See [backend.md](backend.md).
 - **3 — Sync.** ✅ Done. `/me/attempts`, `/me/flags`, `/me/daily`, and
   `secapp/src/components/data/source.js` on the client. Dedupe is a **client-minted attempt
   id**, not `(legacy_hash, submitted_at)` — that key never existed on `attempts`, and a uuid
   the browser generates makes `on conflict do nothing` idempotent with no guessing. No
   `POST /me/import`: recording is gated on an account, so there is no anonymous history to
   merge. No `/me/presets`: nothing in the browser writes one.
-- **4 — Resumable mock exams.** DynamoDB session lifecycle, keyless question delivery,
+- **4 — Resumable mock exams.** ⬜ Not started. DynamoDB session lifecycle, keyless question delivery,
   blueprint-weighted draw, submit + review payload.
 - **5 — ~~Leaderboard~~. Cut.** See [decisions.md](decisions.md).
 - **6 — Deploy.** ✅ Done. **Live at https://certucation.click.** Terraform in
@@ -112,7 +116,7 @@ Each phase ends with the app fully working, deployed or not.
   tidy: the `SameSite=Strict` refresh cookie is never sent to a different domain. No NAT gateway
   (SES is reached through a private endpoint) and no DynamoDB (unused until phase 4). Request-id
   correlation on every log line; JSON logs in `prod`.
-- **7 — Content.** Admin authoring behind the `role` column, question drafts/review, then
+- **7 — Content.** ⬜ Not started. Admin authoring behind the `role` column, question drafts/review, then
   performance-based questions (drag-and-drop, hotspot).
 
 ## Where to look for what

@@ -92,9 +92,9 @@ Read by `server/src/main/resources/application.properties`. All have local defau
 | `DB_URL` | `jdbc:postgresql://localhost:5432/secplus` | SSM Parameter Store |
 | `DB_USER` | `secplus` | SSM |
 | `DB_PASSWORD` | `secplus` | SSM |
-| `DYNAMODB_ENDPOINT` | `http://localhost:8000` | empty = real AWS endpoint |
-| `DYNAMODB_EXAM_SESSIONS_TABLE` | `exam_sessions` | Terraform output |
-| `AWS_REGION` | `us-east-1` | task definition |
+| `DYNAMODB_ENDPOINT` | `http://localhost:8000` | not set — DynamoDB arrives with phase 4 (empty will mean the real AWS endpoint) |
+| `DYNAMODB_EXAM_SESSIONS_TABLE` | `exam_sessions` | not set — phase 4 |
+| `AWS_REGION` | `us-east-1` | not set — only the DynamoDB client reads it, phase 4 |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | the site origin, from the `site_url` output |
 | `MAIL_HOST` | empty | `email-smtp.us-east-1.amazonaws.com` |
 | `MAIL_PORT` | `587` | `587` (STARTTLS, which is what JavaMailSender expects) |
@@ -102,14 +102,14 @@ Read by `server/src/main/resources/application.properties`. All have local defau
 | `MAIL_PASSWORD` | empty | SSM; **derived from** the IAM secret, not the secret itself |
 | `MAIL_FROM` | `no-reply@localhost` | `noreply@certucation.click` (plain env var, not a secret) |
 | `APP_BASE_URL` | `http://localhost:5173` | the site origin — email links point here, not at the API |
-| `PORT` | `8080` | App Runner |
+| `PORT` | `8080` | App Runner's configured port, 8080 (`infra/api.tf`) |
 | `AUTH_JWT_SECRET` | empty → random per start | SSM; **must** be set, see below |
-| `AUTH_COOKIE_SAME_SITE` | `Strict` | `Strict` once the API is same-domain |
+| `AUTH_COOKIE_SAME_SITE` | `Strict` | `Strict` — the API is served on the site's own domain |
 | `AUTH_COOKIE_SECURE` | `false` | `true` |
 | `AUTH_TRUST_FORWARDED_FOR` | `false` | `true`: App Runner's proxy is the socket peer for everyone |
 | `AUTH_FORWARDED_FOR_HOPS` | `1` | `2` behind Amplify's `/api` proxy (observed, see `infra/api.tf`) |
 
-Three of those have failure modes worth knowing, because none of them look like a bug:
+Several of those have failure modes worth knowing, because none of them look like a bug:
 
 - **`AUTH_JWT_SECRET` unset** makes the app generate a key at startup and log a WARN. Sessions
   then die on every restart and deploy — everyone silently signed out. Under 32 bytes fails
@@ -224,8 +224,9 @@ string, so no shell has to expand the path.
 
 ### Doc links
 
-`node scripts/check-doc-links.mjs` asserts every repo path referenced in `CLAUDE.md`,
-`docs/*.md` and `.claude/agents/*.md` actually exists. Wired into `verify.sh` and CI.
+`node scripts/check-doc-links.mjs` asserts every repo path referenced in the root `README.md`,
+`CLAUDE.md`, the folder READMEs (`secapp/README.md` and the like), `docs/*.md`,
+`docs/guide/*.md` and `.claude/agents/*.md` actually exists. Wired into `verify.sh` and CI.
 
 ### Seed freshness
 

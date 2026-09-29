@@ -1,5 +1,5 @@
-// Every repo path named in the README, CLAUDE.md, docs/*.md, docs/guide/*.md and
-// .claude/agents/*.md must exist.
+// Every repo path named in the README, CLAUDE.md, the folder READMEs (secapp/README.md and
+// the like), docs/*.md, docs/guide/*.md and .claude/agents/*.md must exist.
 //
 //   node scripts/check-doc-links.mjs
 //
@@ -62,6 +62,7 @@ const PLANNED = new Set([]);
 const files = [
   'README.md',
   'CLAUDE.md',
+  ...globSync('*/README.md', { cwd: root }),
   ...globSync('docs/*.md', { cwd: root }),
   ...globSync('docs/guide/*.md', { cwd: root }),
   ...globSync('.claude/agents/*.md', { cwd: root }),

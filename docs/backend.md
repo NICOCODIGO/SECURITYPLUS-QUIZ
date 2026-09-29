@@ -3,8 +3,9 @@
 Java 25, Spring Boot 4.1, Gradle wrapper. Lives in `server/`. Schema detail is in
 [database.md](database.md); containers and env vars in [devops.md](devops.md).
 
-**Status:** the public read-only question API and **auth** are live and tested. Attempts and
-exam sessions are still design only — each endpoint below is marked.
+**Status:** the public question API, **auth** (including account security and 2FA) and the
+**`/me` sync endpoints** are built, tested and live. Only the exam-session endpoints (phase 4)
+are still design. Each endpoint group below is marked.
 
 ## Why these versions
 
@@ -24,24 +25,35 @@ by hand.
 ```
 server/src/main/java/com/secplus/
   ServerApplication.java
-  auth/  questions/  common/
-  attempts/  exams/                  ← planned
+  auth/                              accounts, tokens, 2FA, mail, rate limits
+  me/                                the signed-in user's own study data
+  questions/                         the public question API
+  common/                            security config, errors, request ids
+  exams/                             ← planned (phase 4)
 server/src/main/resources/
   application.properties
+  application-prod.properties        live-only settings: JSON logs, no default signing key
   db/migration/V1__init.sql          schema
+  db/migration/V2__account_security.sql  email verification, password reset, 2FA
+  db/migration/V3__totp_last_step.sql    one-use TOTP codes
   db/migration/R__seed_content.sql   the question bank — GENERATED, see database.md
 server/src/test/java/com/secplus/
   ServerApplicationTests.java        context loads
-  SchemaMigrationTests.java          the migration against real Postgres
+  SchemaMigrationTests.java          the migrations against real Postgres
   ContentSeedTests.java              the seeded question bank landed correctly
   QuestionApiTests.java              the public question API
   AuthApiTests.java                  register/login/refresh/logout/me
+  AccountSecurityApiTests.java       verification, reset, 2FA, recovery codes
+  MeApiTests.java                    /me sync, ownership, size limits
   auth/LoginRateLimiterTests.java    window logic — needs no Docker
+  auth/ClientIpTests.java            reading the client address from X-Forwarded-For
+  auth/TotpTests.java                the RFC 6238 test vectors
+  common/RequestIdFilterTests.java   request-id correlation
   TestcontainersConfiguration.java   pinned postgres:17-alpine
   TestServerApplication.java         bootRun with containers
 ```
 
-**52 tests, all passing** against a real Postgres container.
+**105 tests, all passing** against a real Postgres container.
 
 ## Flyway owns the schema
 
@@ -74,8 +86,9 @@ Unauthenticated requests to anything else return **401**, not 403.
 ⬜ `GET /questions/daily?date=` — not built.
 
 **Auth — ✅ built.** `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`,
-`GET /auth/me`. All under `/api/v1`. Everything but `/auth/me` is `permitAll` — you sign in
-without a token by definition, and you sign out with an expired one more often than not.
+`GET /auth/me`. All under `/api/v1`. All but `/auth/me` are `permitAll` — you sign in without
+a token by definition, and you sign out with an expired one more often than not. The account
+security endpoints are listed [below](#account-security---built).
 
 The access token comes back in the body; the refresh token only ever leaves as an httpOnly
 cookie scoped to `/api/v1/auth`, so it is not sent with every question request and script
@@ -88,7 +101,7 @@ machinery, which would mean a readable CSRF cookie and a double-submit dance for
 endpoints on an otherwise stateless API. Omit the header and you get a 4xx, so the front end
 sets it inside `apiClient` rather than at any call site.
 
-**Exams (server session)** — `POST /exams` creates a DynamoDB session and returns questions
+**Exams (server session) — ⬜ phase 4, not built.** The design: `POST /exams` creates a DynamoDB session and returns questions
 **without** `is_correct`; `PATCH /exams/{id}/answers` autosaves; `POST /exams/{id}/submit`
 grades, writes the attempt to Postgres, and returns the full review payload (correct
 answers, explanations, rationales).
@@ -135,10 +148,14 @@ browser can't work out from its own attempts array.
 
 ## Which data is withheld, and which isn't
 
+**Today every mode, the mock exam included, receives the answer key inline and is graded in
+the browser.** A mock exam only hides the answers until you submit. The table below is the
+phase 4 design, in which the mock exam moves to the server:
+
 | Mode | Answer key | Graded |
 |---|---|---|
 | `domain`, `weakest`, `custom` | sent inline | in the browser |
-| `mock` | withheld | on the server |
+| `mock` (phase 4) | withheld | on the server |
 
 Practice quizzes show feedback the instant you answer; a round trip per question would ruin
 that, and a personal practice score isn't worth protecting.
@@ -251,14 +268,17 @@ asserts the two response bodies are identical.
 
 Register returns **409** on a duplicate, which does confirm an address is taken. That narrows
 the rule knowingly: the only non-enumerable alternative is to accept the registration and
-resolve it by email, and there is no mailer here, so that path ends with someone who believes
-they created an account they can never sign into. Recorded in [decisions.md](decisions.md).
+resolve it by email. While SES is in sandbox mode it only delivers to verified addresses, so
+that path ends with someone who believes they created an account they can never sign into.
+Revisit once SES has production access. Recorded in [decisions.md](decisions.md).
 
 ## Testing
 
 New back-end code is expected to come with tests.
 
-- **Unit** — JUnit 5 + AssertJ for grading, the weighted draw, streak calculation.
+- **Unit** — JUnit 5 + AssertJ for self-contained logic: `LoginRateLimiterTests`,
+  `ClientIpTests`, `TotpTests`, `RequestIdFilterTests`. Phase 4's grading and weighted draw
+  belong here too.
 - **Integration** — `@SpringBootTest` + **Testcontainers** against a real Postgres, pinned
   to `postgres:17-alpine` to match the compose files. Never `latest` in a test — that makes
   the suite's result depend on when it was run.

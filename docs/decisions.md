@@ -21,7 +21,7 @@ If you think an entry should be reversed, say so and ask — don't just do it.
 | **Storage keys are namespaced by user id** | Once persistence is gated on an account, a global key means the second person to sign in on a shared browser reads the first one's history as their own. An account exists to keep one person's data safe; a shared key is the opposite | Add a storage key without `scopedKey()` |
 | **Pre-account keys are abandoned, not migrated** | An un-namespaced `quiz_history` belongs to whoever used the browser before accounts existed. Adopting it into the first account that signs in would be the same cross-user bug in a different shape | Auto-import old local data into whichever account signs in first |
 | **Mock exams are server-held for *resume*, not anti-cheat** | With nothing to rank there is nobody to cheat. The real problem is losing 90 minutes to a closed tab | Justify the exam session API with integrity arguments — it won't survive scrutiny |
-| **Register returns 409 on a duplicate email** | A knowing narrowing of "no user enumeration". The alternative needs a mailer this project doesn't have, and without one it produces someone who believes they made an account they can't sign into. Login stays fully non-enumerable | "Fix" the 409 into a 201, or relax login's identical-response rule to match |
+| **Register returns 409 on a duplicate email** | A knowing narrowing of "no user enumeration". The alternative resolves a duplicate by email. There was no mailer when this was decided; there is one now, but SES is still in sandbox mode and only delivers to verified addresses, so the alternative would still leave someone believing they made an account they can't sign into. Revisit once SES has production access. Login stays fully non-enumerable | "Fix" the 409 into a 201, or relax login's identical-response rule to match |
 | **Progress explains itself instead of blurring** | A soft blurred gate was planned, then superseded: once recording required an account there was nothing to blur, so signed-out Progress states plainly that results are not being saved. A *hard* blurred gate lived here from `a4d7e14` to `3f903ce` and its auth was fake | Reintroduce a blur overlay — there is no data behind it to obscure |
 
 ## Home page
@@ -122,11 +122,11 @@ Not bugs. Known, chosen, and waiting.
 
 | Deferred | Why | Blocks / blocked by |
 |---|---|---|
-| **Moving the 147 misfiled questions** | Changes what each domain quiz asks | Do it with the Phase 1 import, not piecemeal |
+| **Moving the 147 misfiled questions** | Changes what each domain quiz asks. The Phase 1 import kept the old filing (`filed_domain`) as it was | Do it as one deliberate change, not piecemeal |
 | **Blueprint-weighted mock draw** | Needs the server-side draw | Phase 4 |
 | **The lesson-reading flow** | Orphaned: wrong route, wrong param reader, unreachable writer | A known gap, not something to work around |
 | **A production image for `secapp/`** | Amplify builds and serves `dist/` | Not needed |
-| **Front-end test framework** | None configured | Considered after Phase 1 |
+| **Front-end test framework** | None configured | Phase 1 is done; not yet revisited |
 | **Fixing the 6 lint problems** | Baseline-tracked instead, so they can't grow | `npm run lint:check` |
 | **`SameSite=None` for the refresh cookie** | Fixed by construction instead: `/api/*` is proxied on the site's own domain (Amplify's 200 rewrite), which makes the cookie first-party. `None` makes it third-party, the category browsers are removing | Done |
 
